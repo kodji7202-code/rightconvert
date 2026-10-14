@@ -49,3 +49,20 @@ def test_customer_preview_refuses_missing_notice_or_link(tmp_path: Path):
         pytest.skip("Windows developer symlink permission unavailable")
     with pytest.raises(ValueError, match="Expected regular"):
         allowed_customer_entries(installer, notices, guide)
+
+
+def test_numpy_notice_required_exactly_when_numpy_is_bundled(tmp_path: Path):
+    """NumPy is not a dependency: a clean build must not demand its notice,
+    but a bundle that froze numpy must never ship without it."""
+    from scripts.package_customer_preview import required_notices
+
+    installer, notices, guide = fixture(tmp_path)
+    assert "NumPy-LICENSE.txt" not in required_notices(tmp_path)
+    allowed_customer_entries(installer, notices, guide)  # no NumPy notice needed
+
+    (tmp_path / "_internal" / "numpy").mkdir(parents=True)
+    assert "NumPy-LICENSE.txt" in required_notices(tmp_path)
+    with pytest.raises(ValueError, match="NumPy-LICENSE"):
+        allowed_customer_entries(installer, notices, guide)
+    (notices / "NumPy-LICENSE.txt").write_text("numpy notice fixture", encoding="utf-8")
+    assert "ThirdPartyNotices/NumPy-LICENSE.txt" in allowed_customer_entries(installer, notices, guide)
