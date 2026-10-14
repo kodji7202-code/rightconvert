@@ -256,10 +256,15 @@ Write-Output ('SHELL: ' + [RcMenuProbe]::Shell($Path, 'Convert to webp', [ref]$i
 if ($invoked) { Write-Output 'QUICK_VERB_INVOKED' }
 '@, (New-Object Text.UTF8Encoding($true)))
     $powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
-    $probeOutput = & $powershell -NoProfile -ExecutionPolicy Bypass -STA -File $shellProbe `
-        -Clsid $script:RightConvertQuickCascadeClsid -Path $image 2>&1
+    # Windows PowerShell 5.1 turns child stderr into a terminating error under
+    # 'Stop'; capture it as text so a failure prints the probe's diagnostics.
+    $ErrorActionPreference = 'Continue'
+    $probeOutput = @(& $powershell -NoProfile -ExecutionPolicy Bypass -STA -File $shellProbe `
+        -Clsid $script:RightConvertQuickCascadeClsid -Path $image 2>&1 | ForEach-Object { "$_" })
+    $probeExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
     $probeOutput | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0) { throw "Context-menu probe failed: exit $LASTEXITCODE" }
+    if ($probeExit -ne 0) { throw "Context-menu probe failed: exit $probeExit" }
     $handlerLine = @($probeOutput | Where-Object { "$_" -like 'HANDLER: *' })
     $shellLine = @($probeOutput | Where-Object { "$_" -like 'SHELL: *' })
     if ($handlerLine.Count -ne 1 -or "$($handlerLine[0])" -notlike '*Convert to webp*' -or
