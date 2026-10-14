@@ -1,0 +1,167 @@
+name: Windows end-to-end
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Official LibreOffice x64 MSI, used only as an isolated QA extraction for the
+  # native Office -> PDF tests. Pinned by SHA-256 (published by TDF as
+  # <msi>.sha256 next to the download); never installed into Windows.
+  LO_VERSION: '26.8.1'
+  LO_FULL_VERSION: '26.8.1.1'
+  LO_SHA256: 'c6298b10cfa1748bcbedad94c62ce771e240e5021bfd6d7a967cd571b04b5312'
+
+jobs:
+  e2e:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install FFmpeg (real binaries, not Chocolatey shims)
+        run: |
+          choco install ffmpeg -y --no-progress
+          $bin = (Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
+          if (-not $bin) { throw "real ffmpeg.exe not found" }
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+
+      - name: Install Python dependencies and PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]" pyinstaller
+          python -m PyInstaller --version
+
+      - name: Build Windows 11 IExplorerCommand DLL and run its COM smoke
+        run: |
+          .\installer\build-native.ps1 -Architecture x64
+          ctest --test-dir .\shell\windows11\out\x64 -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Windows 11 COM smoke failed" }
+
+      - name: Build the PyInstaller one-dir app (build.ps1)
+        run: .\build.ps1 -SkipTests
+
+      - name: Build + ctest classic COM DLL and package both DLLs into the app
+        run: |
+          .\installer\build-classic.ps1 -Architecture x64 -PackageDir .\dist\RightConvert
+          .\installer\build-native.ps1 -Architecture x64 -PackageDir .\dist\RightConvert
+
+      - name: Build the graphical Setup EXE
+        run: |
+          python scripts/build_setup.py
+          if ($LASTEXITCODE -ne 0) { throw "build_setup.py failed" }
+
+      - name: Setup EXE read-only smoke test
+        run: |
+          $report = Join-Path $PWD 'build\setup\smoke.json'
+          $proc = Start-Process -FilePath .\dist\RightConvertSetup.exe -ArgumentList @('--smoke-test', '--smoke-report', ('"' + $report + '"')) -Wait -PassThru
+          Get-Content -LiteralPath $report
+          if ($proc.ExitCode -ne 0) { throw "Setup smoke test exit code $($proc.ExitCode)" }
+          $json = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          if (-not ($json.ok -and $json.executable -and $json.scripts -and $json.files -gt 10)) { throw "Setup smoke test report is not OK" }
+
+      - name: Stage the frozen candidate where the release tests expect it
+        run: |
+          $dest = '.\build\stage7\packed'
+          New-Item -ItemType Directory -Path $dest -Force | Out-Null
+          Copy-Item -LiteralPath .\dist\RightConvert -Destination $dest -Recurse
+          Get-Item .\build\stage7\packed\RightConvert\RightConvert.exe
+
+      - name: Frozen app --direct smoke
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'frozen smoke Ș'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $png = Join-Path $dir 'a b.png'
+          python -c "import sys; from PIL import Image; Image.new('RGB',(20,10),(1,2,3)).save(sys.argv[1])" $png
+          $proc = Start-Process -FilePath .\build\stage7\packed\RightConvert\RightConvert.exe -ArgumentList @('--files', ('"' + $png + '"'), '--target', 'webp', '--direct') -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "frozen --direct exit $($proc.ExitCode)" }
+          if (-not (Test-Path -LiteralPath (Join-Path $dir 'a b.webp'))) { throw "no webp produced" }
+
+      - name: Installer regression scripts (isolated fixtures, Windows PowerShell 5.1)
+        run: |
+          $ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+          foreach ($test in @('test-install-root.ps1', 'test-classic-registry.ps1',
+                              'test-deferred-uninstall.ps1', 'test-legacy-backup.ps1',
+                              'test-reinstall-locked-backup.ps1', 'test-stage7-full-install.ps1')) {
+            Write-Host "::group::$test"
+            & $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path '.\installer' $test)
+            $code = $LASTEXITCODE
+            Write-Host "::endgroup::"
+            if ($code -ne 0) { throw "$test failed with exit code $code" }
+            Write-Host "PASS $test"
+          }
+
+      - name: Real per-user install via Setup code path, Shell context menu, uninstall
+        env:
+          RIGHTCONVERT_E2E_REAL_INSTALL: '1'
+        run: |
+          $ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+          $python = (Get-Command python -CommandType Application | Select-Object -First 1).Source
+          & $ps -NoProfile -ExecutionPolicy Bypass -File .\installer\test-setup-install-e2e.ps1 -Python $python
+          if ($LASTEXITCODE -ne 0) { throw "real install e2e failed with exit code $LASTEXITCODE" }
+
+      - name: Cache the LibreOffice MSI
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\lo-msi
+          key: libreoffice-msi-${{ env.LO_SHA256 }}
+
+      - name: Download + verify + administratively extract official LibreOffice
+        run: |
+          $cache = Join-Path $env:RUNNER_TEMP 'lo-msi'
+          New-Item -ItemType Directory -Path $cache -Force | Out-Null
+          $msi = Join-Path $cache 'LibreOffice.msi'
+          $urls = @(
+            "https://download.documentfoundation.org/libreoffice/stable/$env:LO_VERSION/win/x86_64/LibreOffice_${env:LO_VERSION}_Win_x86-64.msi",
+            "https://downloadarchive.documentfoundation.org/libreoffice/old/$env:LO_FULL_VERSION/win/x86_64/LibreOffice_${env:LO_FULL_VERSION}_Win_x86-64.msi"
+          )
+          if (-not (Test-Path $msi) -or (Get-FileHash $msi -Algorithm SHA256).Hash -ne $env:LO_SHA256) {
+            foreach ($url in $urls) {
+              try { Invoke-WebRequest -Uri $url -OutFile $msi -UseBasicParsing; break } catch { Write-Warning "$url : $_" }
+            }
+          }
+          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash
+          if ($hash -ne $env:LO_SHA256) { throw "LibreOffice MSI SHA-256 mismatch: $hash" }
+          $extract = Join-Path $env:RUNNER_TEMP 'lo-admin'
+          $log = Join-Path $env:RUNNER_TEMP 'lo-admin.log'
+          $proc = Start-Process -FilePath (Join-Path ([Environment]::SystemDirectory) 'msiexec.exe') -ArgumentList @('/a', ('"' + $msi + '"'), '/qn', ('TARGETDIR="' + $extract + '"'), '/L*v', ('"' + $log + '"')) -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { Get-Content $log -Tail 60; throw "msiexec /a failed: $($proc.ExitCode)" }
+          $soffice = Get-ChildItem -LiteralPath $extract -Recurse -Filter soffice.com | Select-Object -First 1
+          if (-not $soffice) { throw "soffice.com not found in the administrative extraction" }
+          $portable = Join-Path $PWD 'build\stage6\libreoffice-isolated\portable-root'
+          New-Item -ItemType Directory -Path (Split-Path $portable) -Force | Out-Null
+          Move-Item -LiteralPath $soffice.Directory.Parent.FullName -Destination $portable
+          $exe = Join-Path $portable 'program\soffice.com'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Expected $exe" }
+          Write-Host "Portable LibreOffice: $exe"
+          Add-Content -Path $env:GITHUB_ENV -Value "RC_LO_PROGRAM=$(Join-Path $portable 'program')"
+
+      - name: Full pytest with every opt-in enabled
+        env:
+          RIGHTCONVERT_STAGE7_OFFICE_NATIVE: '1'
+        run: |
+          # The documented PATH discovery route (absolute directory) for the
+          # engine-level Office tests that rely on an installed provider.
+          $env:PATH = "$env:RC_LO_PROGRAM;$env:PATH"
+          python -m pytest -q -rs
+          if ($LASTEXITCODE -ne 0) { throw "pytest failed" }
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rightconvert-e2e
+          path: |
+            dist/RightConvertSetup.exe
+            build/setup/smoke.json
+          if-no-files-found: ignore
