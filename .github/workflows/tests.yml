@@ -15,8 +15,14 @@ jobs:
       - name: Install FFmpeg (needed by the live Stage6 matrix)
         run: |
           choco install ffmpeg -y --no-progress
-          ffmpeg -version
-          ffprobe -version
+          # Put the real ffmpeg.exe/ffprobe.exe ahead of Chocolatey's shims:
+          # terminating a shim on cancel leaves its child ffmpeg running and
+          # holding the partial output file open.
+          $bin = (Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
+          if (-not $bin) { throw "real ffmpeg.exe not found" }
+          Add-Content -Path $env:GITHUB_PATH -Value $bin
+          & "$bin\ffmpeg.exe" -version
+          & "$bin\ffprobe.exe" -version
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[test]"
       - run: python -m pytest -q -rs
