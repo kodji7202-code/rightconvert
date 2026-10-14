@@ -31,7 +31,13 @@ jobs:
 
       - name: Install FFmpeg (real binaries, not Chocolatey shims)
         run: |
-          choco install ffmpeg -y --no-progress
+          # The community feed has transient outages (HTTP 406/503): retry.
+          foreach ($attempt in 1..4) {
+            choco install ffmpeg -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq 4) { throw "choco install ffmpeg failed" }
+            Start-Sleep -Seconds (20 * $attempt)
+          }
           $bin = (Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
           if (-not $bin) { throw "real ffmpeg.exe not found" }
           Add-Content -Path $env:GITHUB_PATH -Value $bin
