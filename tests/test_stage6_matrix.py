@@ -7,12 +7,16 @@ from pathlib import Path
 import pytest
 
 from scripts import validate_stage6 as stage6
+from rightconvert.formats import media_tools
 
 
 @pytest.fixture(scope="module")
 def acceptance() -> dict:
     # Executes the same code path as `python scripts/validate_stage6.py` in a
     # disposable workspace. The proof is actual conversion and decoding.
+    if media_tools() is None:
+        pytest.skip("Live Stage6 matrix requires independently installed FFmpeg and FFprobe")
+    pytest.importorskip("pymupdf", reason="Independent PDF raster verification requires PyMuPDF")
     return stage6.matrix()
 
 
@@ -49,6 +53,7 @@ def test_document_routes_are_actually_decodable_and_keep_sources(acceptance: dic
 
 
 def test_pdf_fixtures_are_independently_readable(tmp_path: Path) -> None:
+    pytest.importorskip("pymupdf", reason="Independent PDF raster verification requires PyMuPDF")
     pdfs = stage6.make_pdfs(tmp_path)
     assert stage6.pdf_pages_independent(pdfs["single"], [(96, 72)])["pages"] == 1
     assert stage6.pdf_pages_independent(
@@ -74,4 +79,3 @@ def test_office_native_result_is_explicitly_unverified_without_libreoffice(accep
         assert all(entry["status"] == "UNVERIFIED_NO_TRUSTED_FIXTURE"
                    for entry in acceptance["office"])
     assert acceptance["summary"]["office_routes_native_verified"] == 0
-
