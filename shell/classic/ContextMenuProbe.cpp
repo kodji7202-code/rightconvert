@@ -12,6 +12,7 @@
 // Prints one "ITEM: <caption>" line per menu entry and "INVOKED: <caption>"
 // after a successful InvokeCommand. Never registers anything itself.
 #include <windows.h>
+#include <shellapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
 
