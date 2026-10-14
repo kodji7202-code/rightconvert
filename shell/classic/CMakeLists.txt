@@ -25,4 +25,13 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME ClassicMultiSelect
         COMMAND RightConvertClassicSmoke $<TARGET_FILE:RightConvertClassic>)
+    # Not a ctest: needs a real per-user installation. Used by
+    # installer/test-setup-install-e2e.ps1 to build Explorer's item menu.
+    add_executable(RightConvertMenuProbe ContextMenuProbe.cpp)
+    target_compile_features(RightConvertMenuProbe PRIVATE cxx_std_17)
+    target_compile_definitions(RightConvertMenuProbe PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN NOMINMAX)
+    target_link_libraries(RightConvertMenuProbe PRIVATE shell32 ole32 user32)
+    if(MSVC)
+        target_compile_options(RightConvertMenuProbe PRIVATE /W4 /EHsc /permissive-)
+    endif()
 endif()
