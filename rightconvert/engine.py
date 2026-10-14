@@ -556,9 +556,59 @@ def _progress_seconds(line: str) -> float | None:
     return None
 
 
+def _windows_system_directory() -> Path | None:
+    """Return the trusted System32 path without consulting PATH or %SystemRoot%."""
+    try:
+        import ctypes
+
+        buffer = ctypes.create_unicode_buffer(260)
+        length = ctypes.windll.kernel32.GetSystemDirectoryW(buffer, len(buffer))
+    except (AttributeError, OSError):
+        return None
+    if not 0 < length < len(buffer):
+        return None
+    directory = Path(buffer.value)
+    return directory if directory.is_absolute() else None
+
+
+def _kill_process_tree_windows(pid: int) -> bool:
+    """Kill ``pid`` and every descendant on Windows.
+
+    ``Popen.terminate`` only ends the direct child. When FFmpeg is reached
+    through a launcher shim (Chocolatey, Scoop, winget links), the real
+    ffmpeg.exe is a grandchild that keeps running and keeps the staging file
+    open, so cancellation could not clean up. ``taskkill /T`` walks the tree.
+    """
+    system_dir = _windows_system_directory()
+    if system_dir is None:
+        return False
+    taskkill = system_dir / "taskkill.exe"
+    if not taskkill.is_file():
+        return False
+    try:
+        result = subprocess.run(
+            [str(taskkill), "/T", "/F", "/PID", str(pid)],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+            check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
 def _stop_process(proc: subprocess.Popen[str]) -> None:
     if proc.poll() is not None:
         return
+    if sys.platform == "win32" and _kill_process_tree_windows(proc.pid):
+        try:
+            proc.wait(timeout=3)
+            return
+        except subprocess.TimeoutExpired:
+            pass
     proc.terminate()
     try:
         proc.wait(timeout=3)
