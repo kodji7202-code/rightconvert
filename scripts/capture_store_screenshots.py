@@ -86,19 +86,38 @@ def wait_main_window(proc: subprocess.Popen, seconds: float = 60) -> int:
     raise SystemExit("RightConvert main window did not appear")
 
 
-def place(hwnd: int, width: int, height: int) -> None:
+def _move(hwnd: int, x: int, y: int, w: int, h: int) -> None:
     HWND_TOPMOST, SWP_SHOWWINDOW = -1, 0x0040
+    WM_ENTERSIZEMOVE, WM_EXITSIZEMOVE = 0x0231, 0x0232
+    # Tk re-applies its own requested geometry after an external resize unless
+    # the change arrives inside a size/move loop, as a user drag does.
+    user32.SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0)
+    ok = user32.SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW)
+    user32.SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0)
+    if not ok:
+        print(f"SetWindowPos failed: {ctypes.GetLastError()}")
+    time.sleep(0.8)
+
+
+def place(hwnd: int, width: int, height: int) -> None:
     user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-    user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, width, height, SWP_SHOWWINDOW)
-    time.sleep(0.4)
+    _move(hwnd, 0, 0, width, height)
     # Compensate the invisible borders so the *visible* frame is exactly width x height.
     outer = RECT()
     user32.GetWindowRect(hwnd, ctypes.byref(outer))
     vis = frame(hwnd)
     extra_w = (outer.right - outer.left) - (vis.right - vis.left)
     extra_h = (outer.bottom - outer.top) - (vis.bottom - vis.top)
-    user32.SetWindowPos(hwnd, HWND_TOPMOST, -(vis.left - outer.left), 0,
-                        width + extra_w, height + extra_h, SWP_SHOWWINDOW)
+    _move(hwnd, -(vis.left - outer.left), 0, width + extra_w, height + extra_h)
+    vis = frame(hwnd)
+    size = (vis.right - vis.left, vis.bottom - vis.top)
+    print(f"Window frame after resize: {size}")
+    if size[0] < MIN_W or size[1] < MIN_H:
+        print("Resize was not honoured; maximizing instead")
+        user32.ShowWindow(hwnd, 3)  # SW_MAXIMIZE
+        time.sleep(1.0)
+        vis = frame(hwnd)
+        print(f"Window frame maximized: {(vis.right - vis.left, vis.bottom - vis.top)}")
     user32.SetForegroundWindow(hwnd)
     time.sleep(1.2)
 
