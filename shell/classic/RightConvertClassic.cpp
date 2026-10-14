@@ -329,7 +329,10 @@ private:
                             (video && (wcscmp(target, L"mp4") == 0 ||
                                        wcscmp(target, L"webm") == 0)) ||
                             (office && wcscmp(target, L"pdf") == 0);
-            if (!ok || ext == target) return false;
+            // The app never converts a file into its own format, so do not
+            // advertise an action that can only fail (photo.jpeg -> jpg).
+            const std::wstring same = ext == L"jpeg" ? L"jpg" : ext == L"tif" ? L"tiff" : ext;
+            if (!ok || same == target) return false;
         }
         return true;
     }
