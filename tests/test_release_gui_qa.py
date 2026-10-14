@@ -172,7 +172,11 @@ def test_valid_docx_first_run_missing_engine_gives_actionable_setup_hint(
     create, _ = isolated_gui
     doc = _passive_docx(tmp_path / "customer-document.docx")
     before = _digest(doc)
+    # app.py binds its own name at import (`from .office_provider import
+    # find_libreoffice`); engine/formats look it up on office_provider. Patch
+    # both so a LibreOffice on PATH (the e2e runner) cannot leak in.
     monkeypatch.setattr(office_provider, "find_libreoffice", lambda *_: None)
+    monkeypatch.setattr(ui, "find_libreoffice", lambda *_: None)
     app = create([doc])
     _pump(app, lambda: not app.importing)
     assert len(app.files) == 0

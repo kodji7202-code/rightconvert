@@ -24,15 +24,25 @@ def test_document_routes_are_actually_decodable_and_keep_sources(acceptance: dic
     assert acceptance["errors"] == [], acceptance["errors"]
     assert acceptance["summary"]["status"] == "PASS", acceptance
     assert acceptance["summary"]["legacy_routes_unchanged"] == 57
-    assert acceptance["summary"]["new_routes_and_combines_pass"] == 13
+    # With a detected LibreOffice every native Office format must convert for
+    # real (6 extra routes); without one the 13 provider-free routes remain.
+    office = acceptance["libreoffice_executable_detected"]
+    expected_routes = 13 + (len(stage6.OFFICE_FORMATS) if office else 0)
+    assert acceptance["summary"]["new_routes_and_combines_pass"] == expected_routes
     assert acceptance["summary"]["new_routes_and_combines_fail"] == 0
 
     routes = acceptance["routes"]
-    assert len(routes) == 13
-    assert {record["input_family"] for record in routes} == {
+    assert len(routes) == expected_routes
+    families = {
         "pdf-single", "pdf-multi", "image-bmp", "image-jpg", "image-png",
         "image-tiff", "image-webp", "image-group-3",
     }
+    if office:
+        families |= {f"office-{extension}" for extension in stage6.OFFICE_FORMATS}
+    assert {record["input_family"] for record in routes} == families
+    if office:
+        assert {record["target"] for record in routes
+                if record["input_family"].startswith("office-")} == {"pdf"}
     assert {record["target"] for record in routes if record["input_family"] == "pdf-single"} == {
         "png", "jpg", "webp", "tiff", "pngzip"}
     assert {record["target"] for record in routes if record["input_family"] == "pdf-multi"} == {
@@ -68,14 +78,24 @@ def test_staging_cleanup_detector_rejects_leftover(tmp_path: Path) -> None:
     assert not stage6.no_temporary_files(tmp_path)
 
 
-def test_office_native_result_is_explicitly_unverified_without_libreoffice(acceptance: dict) -> None:
+def test_office_native_result_is_verified_or_explicitly_unverified(acceptance: dict) -> None:
     assert {entry["source_format"] for entry in acceptance["office"]} == set(stage6.OFFICE_FORMATS)
     if not acceptance["libreoffice_executable_detected"]:
         assert all(entry["status"] == "UNVERIFIED_NO_LIBREOFFICE"
                    for entry in acceptance["office"])
+        assert acceptance["summary"]["office_routes_native_verified"] == 0
+        assert acceptance["summary"]["office_routes_unverified"] == len(stage6.OFFICE_FORMATS)
     else:
-        # A detected executable alone is insufficient evidence for a native
-        # document format to be advertised as tested.
-        assert all(entry["status"] == "UNVERIFIED_NO_TRUSTED_FIXTURE"
-                   for entry in acceptance["office"])
-    assert acceptance["summary"]["office_routes_native_verified"] == 0
+        # A detected LibreOffice must actually convert every native format
+        # (independently generated fixtures, decoded PDF); nothing may stay
+        # unverified or be reported as tested without a real conversion.
+        assert all(entry["status"] == "PASS" for entry in acceptance["office"]), acceptance["office"]
+        assert acceptance["summary"]["office_routes_native_verified"] == len(stage6.OFFICE_FORMATS)
+        assert acceptance["summary"]["office_routes_unverified"] == 0
+        office_routes = [record for record in acceptance["routes"]
+                         if record["input_family"].startswith("office-")]
+        assert {record["input_family"] for record in office_routes} == {
+            f"office-{extension}" for extension in stage6.OFFICE_FORMATS}
+        for record in office_routes:
+            assert record["status"] == "PASS", record
+            assert record["independent_decode"]["pages"] >= 1, record

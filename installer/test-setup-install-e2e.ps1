@@ -9,8 +9,8 @@
 #     drives Setup's own unpack_payload() + powershell_install() code path.
 #  2. Verifies files, the classic verb, COM classes, quick-menu handler and the
 #     Programs and Features entry, then activates the COM class via registry.
-#  3. Enumerates the real Shell context menu of a file (Shell.Application) and
-#     invokes "Convert to webp" through the native IContextMenu handler.
+#  3. Builds Explorer's complete item menu of a file (native probe) with a
+#     standard-user token and invokes "Convert to webp" through it.
 #  4. Runs the registered UninstallString and verifies everything is removed.
 [CmdletBinding()]
 param(
@@ -28,6 +28,7 @@ if ($env:RIGHTCONVERT_E2E_REAL_INSTALL -ne '1') {
 }
 . (Join-Path $PSScriptRoot 'common.ps1')
 $Python = [IO.Path]::GetFullPath($Python)
+$powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 $SetupExe = [IO.Path]::GetFullPath($SetupExe)
 foreach ($required in @($Python, $SetupExe, (Join-Path $PackageDir 'RightConvert.exe'))) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Missing: $required" }
@@ -193,38 +194,48 @@ print("SETUP_INSTALL_OK")
     }
     Write-Host "Handler-invoked conversion OK: $tiff"
 
-    # Explorer's complete item menu: the static verb must always be there.
-    $shellMenu = Invoke-MenuProbe @('--shell', $image)
+    # Explorer's complete item menu (IShellFolder::GetUIObjectOf), built twice:
+    #  a) in this elevated CI process: diagnostic only. Windows does not load
+    #     shell extensions registered solely per user (HKCU\Software\Classes)
+    #     into elevated processes, so per-user handlers are expected to be
+    #     absent here while per-machine ones (7-Zip) and static verbs load;
+    #  b) with a standard-user, medium-integrity token: the token Explorer has
+    #     on a customer desktop. This is the asserted path, including invoking
+    #     a quick conversion through the complete Shell menu.
+    $elevatedMenu = Invoke-MenuProbe @('--shell', $image)
+    if ($elevatedMenu.Code -ne 0) { throw "Elevated Shell item menu probe failed: exit $($elevatedMenu.Code)" }
+    if ($elevatedMenu.Items -notcontains 'Convert with RightConvert') {
+        throw 'Elevated Shell item context menu does not offer "Convert with RightConvert"'
+    }
+    $elevatedToken = @($elevatedMenu.Lines | Where-Object { $_ -like 'TOKEN: *' }) -join ' '
+    Write-Host "Elevated Shell host ($elevatedToken): per-user quick items present = $($elevatedMenu.Items -contains 'Convert to webp')"
+    $os = Get-CimInstance Win32_OperatingSystem
+    $lua = (Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name EnableLUA -ErrorAction SilentlyContinue).EnableLUA
+    Write-Host "Host: $($os.Caption) $($os.Version) ProductType=$($os.ProductType) EnableLUA=$lua"
+
+    $shellMenu = Invoke-MenuProbe @('--unelevated', '--shell', $image)
+    if ($shellMenu.Code -ne 0) { throw "Standard-user Shell item menu probe failed: exit $($shellMenu.Code)" }
+    if (-not ($shellMenu.Lines -contains 'TOKEN: elevated=0 integrity=0x2000')) {
+        throw "The standard-user Shell probe did not run unelevated at medium integrity: $($shellMenu.Lines | Where-Object { $_ -like 'TOKEN: *' })"
+    }
     if ($shellMenu.Items -notcontains 'Convert with RightConvert') {
         throw 'Shell item context menu does not offer "Convert with RightConvert"'
     }
-    $quickInShell = $shellMenu.Items -contains 'Convert to webp'
-    if (-not $quickInShell) {
-        # Diagnose why the Shell did not load the per-user shellex handler.
-        $policy = $null
-        foreach ($hive in @('HKLM:', 'HKCU:')) {
-            $value = (Get-ItemProperty -Path "$hive\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
-                      -Name EnforceShellExtensionSecurity -ErrorAction SilentlyContinue).EnforceShellExtensionSecurity
-            Write-Host "Policy $hive EnforceShellExtensionSecurity = $value"
-            if ($value -eq 1) { $policy = $hive }
+    foreach ($caption in $expectedImageTargets) {
+        if ($shellMenu.Items -notcontains $caption) {
+            foreach ($hive in @('HKLM:', 'HKCU:')) {
+                $value = (Get-ItemProperty -Path "$hive\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
+                          -Name EnforceShellExtensionSecurity -ErrorAction SilentlyContinue).EnforceShellExtensionSecurity
+                Write-Host "Policy $hive EnforceShellExtensionSecurity = $value"
+            }
+            throw "The standard-user Shell item menu did not load the per-user RightConvertQuick handler ('$caption' missing)"
         }
-        $os = Get-CimInstance Win32_OperatingSystem
-        Write-Host "Host: $($os.Caption) $($os.Version) ProductType=$($os.ProductType)"
-        # Diagnostic only: does approving the CLSID per-user change anything?
-        $approved = 'Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved'
-        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($approved)
-        try { $key.SetValue($script:RightConvertQuickCascadeClsid, 'RightConvert e2e diagnostic') } finally { $key.Close() }
-        try {
-            $retry = Invoke-MenuProbe @('--shell', $image)
-            Write-Host "With HKCU approval: quick items present = $($retry.Items -contains 'Convert to webp')"
-        } finally {
-            $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($approved, $true)
-            try { $key.DeleteValue($script:RightConvertQuickCascadeClsid, $false) } finally { $key.Close() }
-        }
-        throw 'The Shell item menu did not load the per-user RightConvertQuick handler (see diagnostics above)'
     }
-    # Click "Convert to webp" in Explorer's item menu.
-    $shellMenu = Invoke-MenuProbe @('--shell', $image, 'Convert to webp')
+    if (@($shellMenu.Items | Where-Object { $_ -eq 'Convert to png' }).Count -ne 0) {
+        throw 'Shell item menu offers a same-format "Convert to png" for a PNG'
+    }
+    # Click "Convert to webp" in Explorer's item menu (standard-user token).
+    $shellMenu = Invoke-MenuProbe @('--unelevated', '--shell', $image, 'Convert to webp')
     if ($shellMenu.Code -ne 0 -or -not ($shellMenu.Lines -contains 'INVOKED: Convert to webp')) {
         throw "Shell item context menu could not invoke the native 'Convert to webp': exit $($shellMenu.Code)"
     }
