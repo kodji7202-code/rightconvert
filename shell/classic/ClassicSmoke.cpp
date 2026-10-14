@@ -74,6 +74,15 @@ int wmain(int argc, wchar_t** argv) {
     swprintf_s(suffix, L"RightConvertClassic-%08x%04x", guid.Data1, guid.Data2);
     std::wstring folder = std::wstring(temporary) + suffix;
     if (!CreateDirectoryW(folder.c_str(), nullptr)) return 5;
+    // %TEMP% may be an 8.3 short path (e.g. C:\Users\RUNNER~1\...), while
+    // the Shell reports SIGDN_FILESYSPATH in long form. Compare like with like.
+    {
+        std::vector<wchar_t> longer(32768);
+        const DWORD length = GetLongPathNameW(folder.c_str(), longer.data(),
+                                              static_cast<DWORD>(longer.size()));
+        if (length == 0 || length >= longer.size()) return 34;
+        folder.assign(longer.data(), length);
+    }
     const std::wstring dll = folder + L"\\RightConvertClassic.dll";
     const std::wstring exe = folder + L"\\RightConvert.exe";
     const std::wstring report = folder + L"\\args.txt";
