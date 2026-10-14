@@ -92,4 +92,13 @@ runner has it, and uploads the artifact **`RightConvert-Store-msixupload`**.
    justification (text in `docs/STORE_LISTING_DRAFT.md`).
 4. Fill in age rating (IARC questionnaire), privacy policy URL, listing text
    and screenshots (at least one 1366×768+ PNG).
+   * Privacy policy: `PRIVACY.md` (also `docs/privacy.html`, ready for GitHub
+     Pages from `main` `/docs`). URL:
+     `https://github.com/kodji7202-code/rightconvert/blob/main/PRIVACY.md`, or
+     `https://kodji7202-code.github.io/rightconvert/privacy.html` once Pages is
+     enabled in the repository settings.
+   * Screenshots: the `Store screenshots` workflow
+     (`.github/workflows/store-screenshots.yml`, *Run workflow*) builds the app,
+     captures the 1600×900 main window (queue ready, converting, done) with
+     synthetic images and uploads the `RightConvert-Store-screenshots` artifact.
 5. Partner Center signs the package; do not sign the upload yourself.
