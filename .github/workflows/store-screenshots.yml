@@ -1,0 +1,59 @@
+name: Store screenshots
+# Microsoft Store listing screenshots of the real (PyInstaller-built) app.
+# Separate from store-msix.yml so screenshot flakiness never blocks packaging.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'rightconvert/app.py'
+      - 'scripts/capture_store_screenshots.py'
+      - '.github/workflows/store-screenshots.yml'
+
+concurrency:
+  group: store-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies and PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]" pyinstaller
+
+      - name: Build the PyInstaller one-dir app (build.ps1)
+        run: .\build.ps1 -SkipTests
+
+      - name: Set a 1920x1080 display (best effort)
+        continue-on-error: true
+        shell: powershell
+        run: |
+          try { Set-DisplayResolution -Width 1920 -Height 1080 -Force -ErrorAction Stop; Write-Host 'Set-DisplayResolution OK' }
+          catch { Write-Warning "Set-DisplayResolution failed: $_" }
+          Add-Type -AssemblyName System.Windows.Forms
+          Write-Host "Primary screen: $([System.Windows.Forms.Screen]::PrimaryScreen.Bounds)"
+
+      - name: Capture the main window (queue, converting, done)
+        run: |
+          python scripts/capture_store_screenshots.py --exe .\dist\RightConvert\RightConvert.exe --out .\store-screenshots
+          if ($LASTEXITCODE -ne 0) { throw "Screenshot capture failed: $LASTEXITCODE" }
+          Get-ChildItem .\store-screenshots | Format-Table Name, Length
+
+      - name: Upload the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RightConvert-Store-screenshots
+          path: store-screenshots/*.png
+          if-no-files-found: warn
