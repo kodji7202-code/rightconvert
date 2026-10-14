@@ -15,6 +15,7 @@ import pytest
 
 from rightconvert.formats import ConversionCancelled, ConversionError, UnsupportedFormatError
 import rightconvert.office_provider as office
+import rightconvert.engine as engine_module
 
 
 _CT_URI = "http://schemas.openxmlformats.org/package/2006/content-types"
@@ -329,6 +330,8 @@ def test_cancel_in_progress_kills_process_and_cleans_files(tmp_path, monkeypatch
 
     monkeypatch.setattr(office.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(office.subprocess, "run", lambda *args, **kwargs: None)
+    # The Windows tree kill (System32 taskkill.exe) cannot target a mock PID.
+    monkeypatch.setattr(engine_module, "_kill_process_tree_windows", lambda pid: False)
     with pytest.raises(ConversionCancelled):
         office.convert_office_to_pdf(source, scratch, str(exe), cancel=cancel)
     assert holder[0].killed
@@ -349,6 +352,8 @@ def test_timeout_kills_process_and_cleans_files(tmp_path, monkeypatch):
 
     monkeypatch.setattr(office.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(office.subprocess, "run", lambda *args, **kwargs: None)
+    # The Windows tree kill (System32 taskkill.exe) cannot target a mock PID.
+    monkeypatch.setattr(engine_module, "_kill_process_tree_windows", lambda pid: False)
     with pytest.raises(ConversionError, match="timed out"):
         office.convert_office_to_pdf(source, scratch, str(exe), timeout=0.01)
     assert holder[0].killed
