@@ -12,6 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install FFmpeg (needed by the live Stage6 matrix)
+        run: |
+          choco install ffmpeg -y --no-progress
+          ffmpeg -version
+          ffprobe -version
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e ".[test]"
-      - run: python -m pytest -q
+      - run: python -m pytest -q -rs
