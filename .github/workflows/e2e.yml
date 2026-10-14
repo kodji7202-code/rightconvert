@@ -79,6 +79,10 @@ jobs:
 
       - name: Frozen app --direct smoke
         run: |
+          # Keep settings/logs out of the real %LOCALAPPDATA%\RightConvert: the
+          # real-install step below requires a pristine per-user state.
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP 'frozen-smoke-localappdata'
+          New-Item -ItemType Directory -Path $env:LOCALAPPDATA -Force | Out-Null
           $dir = Join-Path $env:RUNNER_TEMP 'frozen smoke Ș'
           New-Item -ItemType Directory -Path $dir -Force | Out-Null
           $png = Join-Path $dir 'a b.png'
@@ -86,6 +90,9 @@ jobs:
           $proc = Start-Process -FilePath .\build\stage7\packed\RightConvert\RightConvert.exe -ArgumentList @('--files', ('"' + $png + '"'), '--target', 'webp', '--direct') -Wait -PassThru
           if ($proc.ExitCode -ne 0) { throw "frozen --direct exit $($proc.ExitCode)" }
           if (-not (Test-Path -LiteralPath (Join-Path $dir 'a b.webp'))) { throw "no webp produced" }
+          if (Test-Path -LiteralPath (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'RightConvert')) {
+            Write-Warning 'Note: RightConvert per-user data exists before the real install step'
+          }
 
       - name: Installer regression scripts (isolated fixtures, Windows PowerShell 5.1)
         run: |
