@@ -167,7 +167,6 @@ def make_fixtures(folder: Path) -> list[Path]:
         ("logo-produs.png", (2400, 2400), (38, 111, 224), (10, 30, 80)),
         ("padure-toamna.bmp", (3600, 2400), (230, 160, 40), (60, 40, 20)),
         ("scanare-document.tiff", (3000, 4000), (250, 250, 245), (180, 180, 170)),
-        ("fotografie-oras.png", (4200, 2800), (120, 130, 160), (20, 20, 40)),
     ]
     paths = []
     for name, size, top, bottom in specs:
