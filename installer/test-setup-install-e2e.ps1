@@ -14,16 +14,19 @@
 #  4. Runs the registered UninstallString and verifies everything is removed.
 [CmdletBinding()]
 param(
-    [string]$SetupExe = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\RightConvertSetup.exe'),
-    [string]$PackageDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\RightConvert'),
+    [string]$SetupExe,
+    [string]$PackageDir,
     [Parameter(Mandatory = $true)][string]$Python
 )
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 leaves $PSScriptRoot empty in param() defaults.
+$repoRoot = Split-Path -Parent $PSScriptRoot
+if (-not $SetupExe) { $SetupExe = Join-Path $repoRoot 'dist\RightConvertSetup.exe' }
+if (-not $PackageDir) { $PackageDir = Join-Path $repoRoot 'dist\RightConvert' }
 if ($env:RIGHTCONVERT_E2E_REAL_INSTALL -ne '1') {
     throw 'Refusing: this performs a real per-user install. Set RIGHTCONVERT_E2E_REAL_INSTALL=1 on a disposable machine.'
 }
 . (Join-Path $PSScriptRoot 'common.ps1')
-$repo = Split-Path -Parent $PSScriptRoot
 $Python = [IO.Path]::GetFullPath($Python)
 $SetupExe = [IO.Path]::GetFullPath($SetupExe)
 foreach ($required in @($Python, $SetupExe, (Join-Path $PackageDir 'RightConvert.exe'))) {
@@ -212,6 +215,25 @@ if ($null -ne $webp) {
     if (Test-Path -LiteralPath $app) { throw "Application folder was not removed: $app" }
     if (Test-Path -LiteralPath (Join-Path $root 'uninstall.ps1')) { throw 'Installed uninstaller left behind' }
     Write-Host 'REAL SETUP INSTALL / CONTEXT MENU / UNINSTALL: PASS'
+
+    # --- 5. README developer path: install.ps1 with no arguments ------------
+    # Uses the default -PackageDir (dist\RightConvert) resolved by the script.
+    $installScript = Join-Path $PSScriptRoot 'install.ps1'
+    $proc = Start-Process -FilePath $powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"' + $installScript + '"')) -WorkingDirectory $repoRoot -Wait -PassThru
+    Assert-Equal $proc.ExitCode 0 'install.ps1 (no arguments) exit code'
+    Assert-Equal (Get-FileHash -LiteralPath $exe).Hash (Get-FileHash -LiteralPath (Join-Path $PackageDir 'RightConvert.exe')).Hash 'Default-package install hash'
+    Assert-Equal (Read-Value ($verb + '\command')) ('"' + $exe + '" --files "%1"') 'Default-package verb command'
+    $uninstallScript = Join-Path $PSScriptRoot 'uninstall.ps1'
+    $proc = Start-Process -FilePath $powershell -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"' + $uninstallScript + '"'), '-PurgeUserData') -Wait -PassThru
+    Assert-Equal $proc.ExitCode 0 'uninstall.ps1 -PurgeUserData exit code'
+    foreach ($relative in @($script:RightConvertVerbKey, $script:RightConvertUninstallKey,
+                            $script:RightConvertClassicKey, $script:RightConvertQuickHandlerKey)) {
+        Assert-KeyAbsent $relative
+    }
+    if (Test-Path -LiteralPath $root) { throw "-PurgeUserData left the RightConvert folder: $root" }
+    Write-Host 'README install.ps1 (default package) / uninstall -PurgeUserData: PASS'
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
