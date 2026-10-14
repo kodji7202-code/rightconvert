@@ -45,6 +45,12 @@ class RECT(ctypes.Structure):
                 ("right", wintypes.LONG), ("bottom", wintypes.LONG)]
 
 
+# 64-bit handles: without argtypes, HWND_TOPMOST (-1) is passed as a 32-bit
+# int and SetWindowPos fails with ERROR_INVALID_WINDOW_HANDLE (1400).
+user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                ctypes.c_int, ctypes.c_int, wintypes.UINT]
+user32.SetWindowPos.restype = wintypes.BOOL
+
 EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
 
@@ -92,7 +98,7 @@ def _move(hwnd: int, x: int, y: int, w: int, h: int) -> None:
     # Tk re-applies its own requested geometry after an external resize unless
     # the change arrives inside a size/move loop, as a user drag does.
     user32.SendMessageW(hwnd, WM_ENTERSIZEMOVE, 0, 0)
-    ok = user32.SetWindowPos(hwnd, HWND_TOPMOST, x, y, w, h, SWP_SHOWWINDOW)
+    ok = user32.SetWindowPos(hwnd, wintypes.HWND(HWND_TOPMOST), x, y, w, h, SWP_SHOWWINDOW)
     user32.SendMessageW(hwnd, WM_EXITSIZEMOVE, 0, 0)
     if not ok:
         print(f"SetWindowPos failed: {ctypes.GetLastError()}")
