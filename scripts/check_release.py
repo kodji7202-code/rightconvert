@@ -13,10 +13,10 @@ import zipfile
 
 if __package__:
     from .package_release import VERSION
-    from .package_customer_preview import REQUIRED_NOTICES, verified_pdfium_notices
+    from .package_customer_preview import required_notices, verified_pdfium_notices
 else:
     from package_release import VERSION
-    from package_customer_preview import REQUIRED_NOTICES, verified_pdfium_notices
+    from package_customer_preview import required_notices, verified_pdfium_notices
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -71,7 +71,7 @@ def verify_pdfium_archive(reader: zipfile.ZipFile, app_dir: Path, prefix: str) -
             raise AssertionError(f"Incorrect archived pypdfium2/PDFium notice: {archive_name}")
     # Other licenses (notably cryptography) are always required and must match
     # the exact files staged into Setup and the Windows distribution.
-    for name in REQUIRED_NOTICES:
+    for name in required_notices(app_dir):
         path = notice_dir / name
         archive_name = notice_prefix + name
         if not path.is_file() or archive_name not in entries:
