@@ -135,147 +135,42 @@ print("SETUP_INSTALL_OK")
     $image = Join-Path $probeDir 'probe image.png'
     & $Python -c "import sys; from PIL import Image; Image.new('RGB', (40, 30), (200, 30, 60)).save(sys.argv[1])" $image
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the probe image' }
-    $shellProbe = Join-Path $work 'shell-probe.ps1'
-    [IO.File]::WriteAllText($shellProbe, @'
-param([string]$Clsid, [string]$Path)
-$ErrorActionPreference = 'Stop'
-Add-Type -TypeDefinition @"
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-[ComImport, Guid("000214E6-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IRcShellFolder {
-    [PreserveSig] int ParseDisplayName(IntPtr hwnd, IntPtr pbc, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr eaten, out IntPtr pidl, IntPtr attributes);
-    [PreserveSig] int EnumObjects(IntPtr hwnd, int flags, out IntPtr enumerator);
-    [PreserveSig] int BindToObject(IntPtr pidl, IntPtr pbc, ref Guid riid, out IntPtr ppv);
-    [PreserveSig] int BindToStorage(IntPtr pidl, IntPtr pbc, ref Guid riid, out IntPtr ppv);
-    [PreserveSig] int CompareIDs(IntPtr lParam, IntPtr first, IntPtr second);
-    [PreserveSig] int CreateViewObject(IntPtr hwnd, ref Guid riid, out IntPtr ppv);
-    [PreserveSig] int GetAttributesOf(uint count, IntPtr pidls, ref uint attributes);
-    [PreserveSig] int GetUIObjectOf(IntPtr hwnd, uint count, [In] IntPtr[] pidls, ref Guid riid, IntPtr reserved, out IntPtr ppv);
-}
-[StructLayout(LayoutKind.Sequential)]
-public struct RcInvokeInfo {
-    public int cbSize; public int fMask; public IntPtr hwnd; public IntPtr lpVerb;
-    public IntPtr lpParameters; public IntPtr lpDirectory; public int nShow; public int dwHotKey; public IntPtr hIcon;
-}
-[ComImport, Guid("000214E4-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IRcContextMenu {
-    [PreserveSig] int QueryContextMenu(IntPtr menu, uint index, uint first, uint last, uint flags);
-    [PreserveSig] int InvokeCommand(ref RcInvokeInfo info);
-    [PreserveSig] int GetCommandString(UIntPtr id, uint type, IntPtr reserved, IntPtr name, uint size);
-}
-[ComImport, Guid("000214E8-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-public interface IRcShellExtInit {
-    [PreserveSig] int Initialize(IntPtr folder, IntPtr data, IntPtr key);
-}
-public static class RcMenuProbe {
-    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
-    static extern int SHParseDisplayName(string name, IntPtr bc, out IntPtr pidl, uint sfgaoIn, out uint sfgaoOut);
-    [DllImport("shell32.dll")]
-    static extern int SHBindToParent(IntPtr pidl, ref Guid riid, out IntPtr ppv, out IntPtr last);
-    [DllImport("user32.dll")] static extern IntPtr CreatePopupMenu();
-    [DllImport("user32.dll")] static extern bool DestroyMenu(IntPtr menu);
-    [DllImport("user32.dll")] static extern int GetMenuItemCount(IntPtr menu);
-    [DllImport("user32.dll")] static extern uint GetMenuItemID(IntPtr menu, int position);
-    [DllImport("user32.dll")] static extern IntPtr GetSubMenu(IntPtr menu, int position);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    static extern int GetMenuStringW(IntPtr menu, uint item, StringBuilder text, int max, uint flags);
-    // Explorer's own item-menu flags: CMF_NORMAL | CMF_EXPLORE | CMF_CANRENAME | CMF_ITEMMENU.
-    const uint ExplorerFlags = 0x4 | 0x10 | 0x80;
-
-    static void Collect(IntPtr menu, List<KeyValuePair<uint, string>> items) {
-        int count = GetMenuItemCount(menu);
-        for (int i = 0; i < count; i++) {
-            var text = new StringBuilder(512);
-            GetMenuStringW(menu, (uint)i, text, text.Capacity, 0x400);
-            IntPtr sub = GetSubMenu(menu, i);
-            items.Add(new KeyValuePair<uint, string>(sub == IntPtr.Zero ? GetMenuItemID(menu, i) : 0xFFFFFFFF,
-                                                     text.ToString().Replace("&", "")));
-            if (sub != IntPtr.Zero) Collect(sub, items);
-        }
+    $menuProbe = Join-Path $repoRoot 'shell\classic\out\x64\Release\RightConvertMenuProbe.exe'
+    if (-not (Test-Path -LiteralPath $menuProbe -PathType Leaf)) { throw "Build the native menu probe first: $menuProbe" }
+    function Invoke-MenuProbe {
+        param([string[]]$Arguments)
+        # Windows PowerShell 5.1 turns child stderr into a terminating error
+        # under 'Stop'; capture it as text so failures print diagnostics.
+        $ErrorActionPreference = 'Continue'
+        $lines = @(& $menuProbe @Arguments 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        $lines | ForEach-Object { Write-Host "  [$($Arguments[0])] $_" }
+        return [pscustomobject]@{ Code = $code; Items = @($lines | Where-Object { $_ -like 'ITEM: *' } | ForEach-Object { $_.Substring(6) }); Lines = $lines }
     }
-    static IntPtr UiObject(string path, Guid iid) {
-        IntPtr pidl; uint ignored;
-        int hr = SHParseDisplayName(path, IntPtr.Zero, out pidl, 0, out ignored);
-        if (hr != 0) throw new COMException("SHParseDisplayName", hr);
-        Guid folderIid = typeof(IRcShellFolder).GUID;
-        IntPtr folderPtr, last;
-        hr = SHBindToParent(pidl, ref folderIid, out folderPtr, out last);
-        if (hr != 0) throw new COMException("SHBindToParent", hr);
-        var folder = (IRcShellFolder)Marshal.GetObjectForIUnknown(folderPtr);
-        IntPtr result;
-        hr = folder.GetUIObjectOf(IntPtr.Zero, 1, new[] { last }, ref iid, IntPtr.Zero, out result);
-        if (hr != 0) throw new COMException("GetUIObjectOf", hr);
-        return result;
+    # The registered handler alone: activated via HKCU COM registration.
+    $handler = Invoke-MenuProbe @('--handler', $script:RightConvertQuickCascadeClsid, $image)
+    if ($handler.Code -ne 0) { throw "Registered quick-menu handler failed: exit $($handler.Code)" }
+    $expectedImageTargets = @('Convert to jpg', 'Convert to webp', 'Convert to pdf', 'Convert to tiff')
+    if (Compare-Object @($handler.Items) $expectedImageTargets) {
+        throw "Handler items for a PNG differ from the image targets: $($handler.Items -join ' | ')"
     }
-    static string Run(IRcContextMenu menuHandler, string invokeText, out bool invoked) {
-        invoked = false;
-        IntPtr menu = CreatePopupMenu();
-        try {
-            int hr = menuHandler.QueryContextMenu(menu, 0, 1, 0x7FFF, ExplorerFlags);
-            if (hr < 0) throw new COMException("QueryContextMenu", hr);
-            var items = new List<KeyValuePair<uint, string>>();
-            Collect(menu, items);
-            var names = new List<string>();
-            foreach (var item in items) {
-                names.Add(item.Value);
-                if (!invoked && invokeText != null && item.Value == invokeText && item.Key != 0xFFFFFFFF) {
-                    var info = new RcInvokeInfo();
-                    info.cbSize = Marshal.SizeOf(typeof(RcInvokeInfo));
-                    info.lpVerb = new IntPtr(item.Key - 1);
-                    info.nShow = 1;
-                    hr = menuHandler.InvokeCommand(ref info);
-                    if (hr != 0) throw new COMException("InvokeCommand", hr);
-                    invoked = true;
-                }
-            }
-            return string.Join(" | ", names);
-        } finally { DestroyMenu(menu); }
+    # Same-format actions can only fail, including extension aliases.
+    $jpeg = Join-Path $probeDir 'photo.jpeg'
+    & $Python -c "import sys; from PIL import Image; Image.new('RGB', (40, 30), (20, 130, 60)).save(sys.argv[1], 'JPEG')" $jpeg
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create the JPEG probe' }
+    $jpegMenu = Invoke-MenuProbe @('--handler', $script:RightConvertQuickCascadeClsid, $jpeg)
+    if ($jpegMenu.Code -ne 0 -or
+        (Compare-Object @($jpegMenu.Items) @('Convert to png', 'Convert to webp', 'Convert to pdf', 'Convert to tiff'))) {
+        throw "Handler items for a .jpeg are wrong: $($jpegMenu.Items -join ' | ')"
     }
-    // The registered handler alone, initialized exactly as Explorer does.
-    public static string Handler(Guid clsid, string path) {
-        object instance = Activator.CreateInstance(Type.GetTypeFromCLSID(clsid, true));
-        IntPtr data = UiObject(path, new Guid("0000010e-0000-0000-C000-000000000046"));
-        int hr = ((IRcShellExtInit)instance).Initialize(IntPtr.Zero, data, IntPtr.Zero);
-        if (hr != 0) throw new COMException("IShellExtInit.Initialize", hr);
-        bool unused;
-        return Run((IRcContextMenu)instance, null, out unused);
-    }
-    // The complete Shell item context menu, as Explorer builds it.
-    public static string Shell(string path, string invokeText, out bool invoked) {
-        IntPtr pointer = UiObject(path, typeof(IRcContextMenu).GUID);
-        return Run((IRcContextMenu)Marshal.GetObjectForIUnknown(pointer), invokeText, out invoked);
-    }
-}
-"@
-Write-Output ('HANDLER: ' + [RcMenuProbe]::Handler([guid]$Clsid, $Path))
-$invoked = $false
-Write-Output ('SHELL: ' + [RcMenuProbe]::Shell($Path, 'Convert to webp', [ref]$invoked))
-if ($invoked) { Write-Output 'QUICK_VERB_INVOKED' }
-'@, (New-Object Text.UTF8Encoding($true)))
-    $powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
-    # Windows PowerShell 5.1 turns child stderr into a terminating error under
-    # 'Stop'; capture it as text so a failure prints the probe's diagnostics.
-    $ErrorActionPreference = 'Continue'
-    $probeOutput = @(& $powershell -NoProfile -ExecutionPolicy Bypass -STA -File $shellProbe `
-        -Clsid $script:RightConvertQuickCascadeClsid -Path $image 2>&1 | ForEach-Object { "$_" })
-    $probeExit = $LASTEXITCODE
-    $ErrorActionPreference = 'Stop'
-    $probeOutput | ForEach-Object { Write-Host $_ }
-    if ($probeExit -ne 0) { throw "Context-menu probe failed: exit $probeExit" }
-    $handlerLine = @($probeOutput | Where-Object { "$_" -like 'HANDLER: *' })
-    $shellLine = @($probeOutput | Where-Object { "$_" -like 'SHELL: *' })
-    if ($handlerLine.Count -ne 1 -or "$($handlerLine[0])" -notlike '*Convert to webp*' -or
-        "$($handlerLine[0])" -match 'Convert to (mp3|mp4|PNG \(all)') {
-        throw 'The registered native handler does not offer exactly the image quick targets for a PNG'
-    }
-    if ($shellLine.Count -ne 1 -or "$($shellLine[0])" -notmatch 'Convert with RightConvert') {
+    # Explorer's complete item menu, then click "Convert to webp" in it.
+    $shellMenu = Invoke-MenuProbe @('--shell', $image, 'Convert to webp')
+    if ($shellMenu.Items -notcontains 'Convert with RightConvert') {
         throw 'Shell item context menu does not offer "Convert with RightConvert"'
     }
-    if (-not ($probeOutput -match 'QUICK_VERB_INVOKED')) {
-        throw 'Shell context menu does not offer the native "Convert to webp" action'
+    if ($shellMenu.Code -ne 0 -or -not ($shellMenu.Lines -contains 'INVOKED: Convert to webp')) {
+        throw "Shell item context menu could not invoke the native 'Convert to webp': exit $($shellMenu.Code)"
     }
     $converted = Join-Path $probeDir 'probe image.webp'
     $deadline = (Get-Date).AddSeconds(60)
