@@ -164,27 +164,72 @@ print("SETUP_INSTALL_OK")
         (Compare-Object @($jpegMenu.Items) @('Convert to png', 'Convert to webp', 'Convert to pdf', 'Convert to tiff'))) {
         throw "Handler items for a .jpeg are wrong: $($jpegMenu.Items -join ' | ')"
     }
-    # Explorer's complete item menu, then click "Convert to webp" in it.
-    $shellMenu = Invoke-MenuProbe @('--shell', $image, 'Convert to webp')
+    function Wait-Output {
+        param([string]$Path)
+        $deadline = (Get-Date).AddSeconds(60)
+        while (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+            if ((Get-Date) -gt $deadline) { throw "Context-menu conversion produced no output: $Path" }
+            Start-Sleep -Milliseconds 250
+        }
+        # Wait until the separate --direct process has published and exited.
+        $deadline = (Get-Date).AddSeconds(60)
+        while (@(Get-Process -Name 'RightConvert' -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Path -eq $exe }).Count -gt 0) {
+            if ((Get-Date) -gt $deadline) { throw 'RightConvert --direct did not exit' }
+            Start-Sleep -Milliseconds 250
+        }
+    }
+    # Click "Convert to tiff" on the registered handler itself: the DLL must
+    # launch the installed RightConvert.exe --direct with the selection.
+    $handlerInvoke = Invoke-MenuProbe @('--handler', $script:RightConvertQuickCascadeClsid, $image, 'Convert to tiff')
+    if ($handlerInvoke.Code -ne 0 -or -not ($handlerInvoke.Lines -contains 'INVOKED: Convert to tiff')) {
+        throw "Handler could not invoke 'Convert to tiff': exit $($handlerInvoke.Code)"
+    }
+    $tiff = Join-Path $probeDir 'probe image.tiff'
+    Wait-Output $tiff
+    $magic = [IO.File]::ReadAllBytes($tiff)[0..3]
+    if (-not (($magic[0] -eq 0x49 -and $magic[1] -eq 0x49) -or ($magic[0] -eq 0x4D -and $magic[1] -eq 0x4D))) {
+        throw 'Handler-invoked output is not a TIFF file'
+    }
+    Write-Host "Handler-invoked conversion OK: $tiff"
+
+    # Explorer's complete item menu: the static verb must always be there.
+    $shellMenu = Invoke-MenuProbe @('--shell', $image)
     if ($shellMenu.Items -notcontains 'Convert with RightConvert') {
         throw 'Shell item context menu does not offer "Convert with RightConvert"'
     }
+    $quickInShell = $shellMenu.Items -contains 'Convert to webp'
+    if (-not $quickInShell) {
+        # Diagnose why the Shell did not load the per-user shellex handler.
+        $policy = $null
+        foreach ($hive in @('HKLM:', 'HKCU:')) {
+            $value = (Get-ItemProperty -Path "$hive\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
+                      -Name EnforceShellExtensionSecurity -ErrorAction SilentlyContinue).EnforceShellExtensionSecurity
+            Write-Host "Policy $hive EnforceShellExtensionSecurity = $value"
+            if ($value -eq 1) { $policy = $hive }
+        }
+        $os = Get-CimInstance Win32_OperatingSystem
+        Write-Host "Host: $($os.Caption) $($os.Version) ProductType=$($os.ProductType)"
+        # Diagnostic only: does approving the CLSID per-user change anything?
+        $approved = 'Software\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved'
+        $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($approved)
+        try { $key.SetValue($script:RightConvertQuickCascadeClsid, 'RightConvert e2e diagnostic') } finally { $key.Close() }
+        try {
+            $retry = Invoke-MenuProbe @('--shell', $image)
+            Write-Host "With HKCU approval: quick items present = $($retry.Items -contains 'Convert to webp')"
+        } finally {
+            $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($approved, $true)
+            try { $key.DeleteValue($script:RightConvertQuickCascadeClsid, $false) } finally { $key.Close() }
+        }
+        throw 'The Shell item menu did not load the per-user RightConvertQuick handler (see diagnostics above)'
+    }
+    # Click "Convert to webp" in Explorer's item menu.
+    $shellMenu = Invoke-MenuProbe @('--shell', $image, 'Convert to webp')
     if ($shellMenu.Code -ne 0 -or -not ($shellMenu.Lines -contains 'INVOKED: Convert to webp')) {
         throw "Shell item context menu could not invoke the native 'Convert to webp': exit $($shellMenu.Code)"
     }
     $converted = Join-Path $probeDir 'probe image.webp'
-    $deadline = (Get-Date).AddSeconds(60)
-    while (-not (Test-Path -LiteralPath $converted -PathType Leaf)) {
-        if ((Get-Date) -gt $deadline) { throw "Context-menu conversion produced no output: $converted" }
-        Start-Sleep -Milliseconds 250
-    }
-    # Wait until the separate --direct process has published and exited.
-    $deadline = (Get-Date).AddSeconds(60)
-    while (@(Get-Process -Name 'RightConvert' -ErrorAction SilentlyContinue |
-             Where-Object { $_.Path -eq $exe }).Count -gt 0) {
-        if ((Get-Date) -gt $deadline) { throw 'RightConvert --direct did not exit' }
-        Start-Sleep -Milliseconds 250
-    }
+    Wait-Output $converted
     $header = [IO.File]::ReadAllBytes($converted)[0..11]
     if ([Text.Encoding]::ASCII.GetString($header, 0, 4) -ne 'RIFF' -or
         [Text.Encoding]::ASCII.GetString($header, 8, 4) -ne 'WEBP') {
