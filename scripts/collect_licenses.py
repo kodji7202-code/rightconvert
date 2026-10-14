@@ -121,13 +121,16 @@ def main() -> None:
         raise SystemExit("Build RightConvert first")
     sources = {
         "Pillow-LICENSE.txt": locate_license("pillow", ".dist-info/licenses/LICENSE"),
-        "NumPy-LICENSE.txt": locate_license("numpy", ".dist-info/LICENSE.txt"),
         "PyInstaller-COPYING.txt": locate_license("pyinstaller", ".dist-info/licenses/COPYING.txt"),
         "Python-LICENSE.txt": Path(sys.base_prefix) / "LICENSE.txt",
         "cryptography-LICENSE.txt": locate_license("cryptography", ".dist-info/licenses/LICENSE"),
         "cryptography-APACHE.txt": locate_license("cryptography", ".dist-info/licenses/LICENSE.APACHE"),
         "cryptography-BSD.txt": locate_license("cryptography", ".dist-info/licenses/LICENSE.BSD"),
     }
+    # NumPy is not a dependency. Ship its notice exactly when PyInstaller froze
+    # it from the build environment; a bundled copy without metadata fails.
+    if any((base / "numpy").is_dir() for base in (bundle, bundle / "_internal")):
+        sources["NumPy-LICENSE.txt"] = locate_license("numpy", ".dist-info/LICENSE.txt")
     pdfium_sources, pdfium_details = pdfium_notices(bundle)
     for name, path in pdfium_sources.items():
         sources[name] = path
@@ -140,7 +143,10 @@ def main() -> None:
         shutil.copyfile(path, output)
     (DEST / "README.txt").write_text(
         "RightConvert distribution: third-party notices copied from the exact build environment.\n"
-        "Pillow: MIT-CMU; NumPy: BSD and bundled subcomponent notices, see license text;\n"
+        "Pillow: MIT-CMU;"
+        + (" NumPy: BSD and bundled subcomponent notices, see license text;"
+           if "NumPy-LICENSE.txt" in sources else "")
+        + "\n"
         "Python/Tcl/Tk: PSF/Tcl/Tk; PyInstaller: GPL with bootloader exception.\n"
         "cryptography: Apache-2.0 OR BSD-3-Clause; both terms included in notices.\n"
         + pdfium_details
