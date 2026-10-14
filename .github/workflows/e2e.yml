@@ -164,8 +164,10 @@ jobs:
         run: |
           # The documented PATH discovery route (absolute directory) for the
           # engine-level Office tests that rely on an installed provider.
-          $env:PATH = "$env:RC_LO_PROGRAM;$env:PATH"
-          python -m pytest -q -rs
+          # Append (never prepend): LibreOffice's program folder ships its own
+          # python.exe. The test interpreter is called by absolute path.
+          $env:PATH = "$env:PATH;$env:RC_LO_PROGRAM"
+          & (Join-Path $env:pythonLocation 'python.exe') -m pytest -q -rs
           if ($LASTEXITCODE -ne 0) { throw "pytest failed" }
 
       - name: Upload build artifacts
