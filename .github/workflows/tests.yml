@@ -14,7 +14,13 @@ jobs:
           python-version: '3.12'
       - name: Install FFmpeg (needed by the live Stage6 matrix)
         run: |
-          choco install ffmpeg -y --no-progress
+          # The community feed has transient outages (HTTP 406/503): retry.
+          foreach ($attempt in 1..4) {
+            choco install ffmpeg -y --no-progress
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -eq 4) { throw "choco install ffmpeg failed" }
+            Start-Sleep -Seconds (20 * $attempt)
+          }
           # Put the real ffmpeg.exe/ffprobe.exe ahead of Chocolatey's shims:
           # terminating a shim on cancel leaves its child ffmpeg running and
           # holding the partial output file open.
