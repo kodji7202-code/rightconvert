@@ -369,8 +369,50 @@ def _executable(candidate: Path) -> str | None:
         return None
 
 
+def _system_libreoffice() -> str | None:
+    """Locate a machine-wide LibreOffice installed by its official installer.
+
+    Only administrator-owned locations are considered: the official MSI's
+    ``HKLM\\SOFTWARE\\LibreOffice\\UNO\\InstallPath`` value and the standard
+    ``Program Files`` folders. This also works from the Microsoft Store (MSIX)
+    build: full-trust packaged apps read HKLM and Program Files normally.
+    Set ``RIGHTCONVERT_SYSTEM_OFFICE_LOOKUP=0`` to disable (used by tests).
+    """
+    if os.name != "nt" or os.environ.get("RIGHTCONVERT_SYSTEM_OFFICE_LOOKUP", "1") == "0":
+        return None
+    folders: list[Path] = []
+    try:
+        import winreg
+        for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+            try:
+                with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\LibreOffice\UNO\InstallPath",
+                                    0, winreg.KEY_READ | view) as key:
+                    value, kind = winreg.QueryValueEx(key, "")
+                if kind in (winreg.REG_SZ, winreg.REG_EXPAND_SZ) and isinstance(value, str):
+                    folders.append(Path(os.path.expandvars(value)))
+            except OSError:
+                continue
+    except ImportError:
+        pass
+    for variable in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)"):
+        base = os.environ.get(variable)
+        if base:
+            folders.append(Path(base) / "LibreOffice" / "program")
+    seen: set[str] = set()
+    for folder in folders:
+        if not folder.is_absolute() or str(folder).casefold() in seen:
+            continue
+        seen.add(str(folder).casefold())
+        for name in ("soffice.exe", "soffice.com"):
+            found = _executable(folder / name)
+            if found is not None:
+                return found
+    return None
+
+
 def find_libreoffice(configured: str | None = None) -> str | None:
-    """Find an explicitly configured binary or a canonical absolute PATH entry.
+    """Find an explicitly configured binary, a canonical absolute PATH entry,
+    or (last) a machine-wide official installation.
 
     Never invokes shell, ``shutil.which``, implicit CWD or relative PATH entries.
     """
@@ -406,7 +448,7 @@ def find_libreoffice(configured: str | None = None) -> str | None:
             found = _executable(directory / name)
             if found is not None:
                 return found
-    return None
+    return _system_libreoffice()
 
 
 def _stop_process(proc: subprocess.Popen[bytes]) -> None:

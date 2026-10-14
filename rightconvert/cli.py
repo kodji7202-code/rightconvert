@@ -17,7 +17,45 @@ def parser() -> argparse.ArgumentParser:
                      help="Convert selected files directly without opening the GUI; requires --target and --files")
     app.add_argument("--notify", action="store_true",
                      help="Show an error dialog for a failed direct Explorer conversion")
+    app.add_argument("--self-check", metavar="REPORT", default=None,
+                     help="Write a JSON diagnostic report (package identity, data folder, "
+                          "LibreOffice discovery) and exit without opening the GUI")
     return app
+
+
+def _self_check(report: str) -> int:
+    """GUI-free diagnostics used by the Store MSIX CI and for support.
+
+    Contains no file contents and no user documents; only runtime facts.
+    """
+    import json
+    import sys
+    from . import __version__
+    from .config import data_dir, technical_logger
+    from .office_provider import find_libreoffice
+    from .runtime import package_family_name, package_full_name
+
+    log = technical_logger()
+    log.info("Self-check requested")
+    for handler in log.handlers:
+        handler.flush()
+    folder = data_dir()
+    facts = {
+        "ok": True,
+        "version": __version__,
+        "frozen": bool(getattr(sys, "frozen", False)),
+        "executable": sys.executable,
+        "packaged": package_full_name() is not None,
+        "package_full_name": package_full_name(),
+        "package_family_name": package_family_name(),
+        "data_dir": str(folder),
+        "technical_log_written": (folder / "logs" / "technical.log").is_file(),
+        "libreoffice": find_libreoffice(),
+    }
+    target = Path(report)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(facts, ensure_ascii=False, indent=2), encoding="utf-8")
+    return 0
 
 
 def _show_direct_error(message: str) -> None:
@@ -69,6 +107,8 @@ def _convert_direct(files: list[str], target: str, *, notify: bool = False) -> i
 def main(argv: list[str] | None = None) -> int:
     cli = parser()
     args = cli.parse_args(argv)
+    if args.self_check is not None:
+        return _self_check(args.self_check)
     if args.auto_start and args.direct:
         cli.error("--auto-start and --direct cannot be used together")
     if args.notify and not args.direct:

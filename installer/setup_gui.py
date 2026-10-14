@@ -549,6 +549,26 @@ class SetupWindow:
         self.root.mainloop()
 
 
+def running_packaged() -> bool:
+    """True inside an MSIX package (e.g. the Microsoft Store build).
+
+    The Store package declares its own Explorer integration and Windows owns
+    install/uninstall, so this per-user registry installer must never run there.
+    """
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        function = ctypes.windll.kernel32.GetCurrentPackageFullName
+    except (AttributeError, OSError):
+        return False
+    function.argtypes = [ctypes.POINTER(wintypes.UINT), wintypes.LPWSTR]
+    function.restype = wintypes.LONG
+    length = wintypes.UINT(0)
+    return function(ctypes.byref(length), None) == 122  # ERROR_INSUFFICIENT_BUFFER
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Per-user RightConvert graphical setup")
     parser.add_argument(
@@ -560,6 +580,10 @@ def main(argv: list[str] | None = None) -> int:
     if options.smoke_test:
         report = options.smoke_report or Path(tempfile.gettempdir()) / "RightConvertSetup-smoke.json"
         return smoke_test(report)
+    if running_packaged():
+        messagebox.showinfo(APP_NAME, "RightConvert este instalat din Microsoft Store; "
+                            "instalarea per utilizator nu este necesară.")
+        return 3
     SetupWindow().run()
     return 0
 

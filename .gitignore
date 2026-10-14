@@ -29,3 +29,8 @@ __pycache__/
 *.secret
 *credentials*
 *private-key*
+
+# Store MSIX build output
+/msix-store/out/
+*.msixupload
+*.appxsym

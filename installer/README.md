@@ -2,6 +2,15 @@
 
 RightConvert installs per user, works offline and does not need administrator rights for the Windows 10 classic context menu. Windows 11 compact right-click integration requires a native DLL and a signed sparse MSIX package.
 
+## Microsoft Store package (full MSIX)
+
+The Store build is a separate **full** MSIX (`Kodji.RightConvert`, contains the
+app; the Store signs it) produced by `msix-store\build-store-msix.ps1` and the
+`Store MSIX` GitHub workflow, which uploads the `RightConvert-Store-msixupload`
+artifact. Inside the package nothing in this folder runs: Windows installs the
+app, the Windows 11 menu and the Start entry, and the Setup EXE refuses to run
+with package identity. See [docs/STORE.md](../docs/STORE.md).
+
 ## Standalone graphical installer (recommended)
 
 After building the latest application in dist\RightConvert, create the single

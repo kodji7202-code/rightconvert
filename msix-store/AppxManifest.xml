@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Microsoft Store FULL MSIX package for RightConvert (contains the app binaries).
+  Identity values come verbatim from Partner Center (Store ID 9NJLJ335RDFM,
+  PFN Kodji.RightConvert_h9nm9abegh7ny). The Store re-signs the package, so the
+  uploaded .msix is unsigned. Version: Major.Minor.Build.0 (revision MUST be 0).
+
+  This is separate from shell/windows11/AppxManifest.xml, the identity-only
+  sparse package used by the non-Store (Setup EXE) distribution.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 desktop desktop4 desktop5 com rescap">
+
+  <Identity Name="Kodji.RightConvert"
+            Publisher="CN=E1377659-5DF2-4C93-A649-DE2676D88DD2"
+            Version="1.0.0.0"
+            ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>RightConvert</DisplayName>
+    <PublisherDisplayName>Kodji</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Offline file converter with a File Explorer right-click command.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-US" />
+    <Resource Language="ro-RO" />
+  </Resources>
+
+  <Applications>
+    <Application Id="RightConvert"
+                 Executable="RightConvert.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="RightConvert"
+                          Description="Offline file converter with a File Explorer right-click command."
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          Square44x44Logo="Assets\Square44x44Logo.png"
+                          BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png"
+                         Square71x71Logo="Assets\Square71x71Logo.png"
+                         Square310x310Logo="Assets\Square310x310Logo.png"
+                         ShortName="RightConvert" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Command-line alias: "RightConvert.exe" resolves to this package's app. -->
+        <uap3:Extension Category="windows.appExecutionAlias"
+                        Executable="RightConvert.exe"
+                        EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="RightConvert.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+        <!-- Windows 11 modern File Explorer menu: the same IExplorerCommand DLL
+             and CLSID as the sparse package (shell/windows11/RightConvertExplorer.cpp). -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="RightConvert shell command">
+              <com:Class Id="AA7FB3F0-5E6C-4D75-A22F-C0A8D7A63211"
+                         Path="RightConvertExplorer.dll"
+                         ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="RightConvertConvert"
+                             Clsid="AA7FB3F0-5E6C-4D75-A22F-C0A8D7A63211" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

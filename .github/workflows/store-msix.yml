@@ -1,0 +1,261 @@
+name: Store MSIX
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (Major.Minor.Build.0 - revision must be 0)'
+        required: false
+        default: '1.0.0.0'
+
+concurrency:
+  group: store-msix-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE_VERSION: ${{ github.event.inputs.version || '1.0.0.0' }}
+  # Partner Center identity (msix-store/AppxManifest.xml). The test certificate
+  # uses the same Publisher subject, so the sideloaded PFN equals the Store PFN.
+  EXPECTED_PFN: 'Kodji.RightConvert_h9nm9abegh7ny'
+
+jobs:
+  store-msix:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies and PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]" pyinstaller
+
+      - name: Build the Windows 11 IExplorerCommand DLL (+ COM smoke)
+        run: |
+          .\installer\build-native.ps1 -Architecture x64
+          ctest --test-dir .\shell\windows11\out\x64 -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw "Windows 11 COM smoke failed" }
+
+      - name: Build the PyInstaller one-dir app (build.ps1)
+        run: .\build.ps1 -SkipTests
+
+      - name: Build the Store MSIX, .msixupload and a TEST-signed sideload copy
+        run: |
+          .\msix-store\build-store-msix.ps1 -AppDirectory .\dist\RightConvert `
+            -ExplorerDll .\shell\windows11\out\x64\Release\RightConvertExplorer.dll `
+            -Version $env:PACKAGE_VERSION -OutputDirectory .\msix-store\out -TestSign
+          Get-ChildItem .\msix-store\out | Format-Table Name, Length
+
+      - name: Validate the package contents and manifest identity
+        run: |
+          $base = "RightConvert_${env:PACKAGE_VERSION}_x64"
+          $msix = ".\msix-store\out\$base.msix"
+          $sdk = (Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName -Descending | Select-Object -First 1).FullName
+          $unpacked = Join-Path $env:RUNNER_TEMP 'msix-unpacked'
+          & $sdk unpack /o /p $msix /d $unpacked
+          if ($LASTEXITCODE -ne 0) { throw "makeappx unpack failed" }
+          [xml]$m = Get-Content (Join-Path $unpacked 'AppxManifest.xml') -Raw
+          $id = $m.Package.Identity
+          if ($id.Name -ne 'Kodji.RightConvert') { throw "Identity Name $($id.Name)" }
+          if ($id.Publisher -ne 'CN=E1377659-5DF2-4C93-A649-DE2676D88DD2') { throw "Publisher $($id.Publisher)" }
+          if ($id.Version -ne $env:PACKAGE_VERSION -or -not $id.Version.EndsWith('.0')) { throw "Version $($id.Version)" }
+          if ($m.Package.Properties.PublisherDisplayName -ne 'Kodji') { throw 'PublisherDisplayName' }
+          if ($m.Package.Properties.DisplayName -ne 'RightConvert') { throw 'DisplayName' }
+          foreach ($f in 'RightConvert.exe', 'RightConvertExplorer.dll', 'resources.pri', 'Assets\StoreLogo.png',
+                         'Assets\Square44x44Logo.png', 'Assets\Square150x150Logo.png', 'Assets\Wide310x150Logo.png') {
+            if (-not (Test-Path (Join-Path $unpacked $f))) { throw "Missing $f in package" }
+          }
+          if (Test-Path (Join-Path $unpacked 'RightConvertClassic.dll')) { throw 'Classic registry DLL must not ship in the Store package' }
+          $upload = ".\msix-store\out\$base.msixupload"
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $z = [IO.Compression.ZipFile]::OpenRead((Resolve-Path $upload))
+          try { $names = $z.Entries.FullName } finally { $z.Dispose() }
+          Write-Host "msixupload entries: $($names -join ', ')"
+          if ($names -notcontains "$base.msix") { throw '.msixupload does not contain the .msix' }
+          $sig = Get-AuthenticodeSignature $msix
+          Write-Host "Store .msix signature status (expected NotSigned): $($sig.Status)"
+          if ($sig.Status -ne 'NotSigned') { throw 'The Store upload must be unsigned' }
+
+      # Appx cmdlets are run in Windows PowerShell 5.1: the Appx module is not
+      # reliably loadable in PowerShell 7 on every Windows Server image.
+      - name: Sideload-install the TEST-signed package
+        shell: powershell
+        run: |
+          $cer = '.\msix-store\out\RightConvert-StoreTest.cer'
+          Import-Certificate -FilePath $cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+          $test = ".\msix-store\out\RightConvert_${env:PACKAGE_VERSION}_x64.test.msix"
+          Add-AppxPackage -Path $test
+          $pkg = Get-AppxPackage -Name Kodji.RightConvert
+          if (-not $pkg) { throw 'Package not installed' }
+          $pkg | Format-List Name, PackageFullName, PackageFamilyName, InstallLocation, SignatureKind, Status
+          if ($pkg.PackageFamilyName -ne $env:EXPECTED_PFN) { throw "PFN $($pkg.PackageFamilyName) != $env:EXPECTED_PFN" }
+          $app = (Get-AppxPackageManifest $pkg).Package.Applications.Application
+          $aumid = "$($pkg.PackageFamilyName)!$($app.Id)"
+          Write-Host "AUMID: $aumid"
+          Add-Content -Path $env:GITHUB_ENV -Value "RC_AUMID=$aumid"
+          Add-Content -Path $env:GITHUB_ENV -Value "RC_INSTALL=$($pkg.InstallLocation)"
+          if (Get-Command Get-StartApps -ErrorAction SilentlyContinue) {
+            $start = Get-StartApps | Where-Object AppID -eq $aumid
+            if (-not $start) { throw 'RightConvert is not listed in the Start menu apps (shell:AppsFolder)' }
+            Write-Host "Start menu entry: $($start.Name) -> $($start.AppID)"
+          } else { Write-Warning 'Get-StartApps unavailable on this image; Start menu listing not checked' }
+
+      - name: Launch via AUMID, self-check, CLI conversion
+        shell: powershell
+        run: |
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          [ComImport, Guid("2e941141-7f97-4756-ba1d-9decde894a3d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+          public interface IApplicationActivationManager {
+              [PreserveSig] int ActivateApplication([MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+                  [MarshalAs(UnmanagedType.LPWStr)] string arguments, int options, out uint processId);
+          }
+          [ComImport, Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
+          public class ApplicationActivationManager {}
+          public static class RcActivate {
+              public static uint Launch(string aumid, string args) {
+                  var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+                  uint pid;
+                  int hr = manager.ActivateApplication(aumid, args, 0, out pid);
+                  if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                  return pid;
+              }
+          }
+          '@
+          function Wait-File($path, $seconds) {
+            $deadline = (Get-Date).AddSeconds($seconds)
+            while ((Get-Date) -lt $deadline) { if (Test-Path -LiteralPath $path) { Start-Sleep -Milliseconds 500; return $true }; Start-Sleep -Milliseconds 500 }
+            return $false
+          }
+          # Outside AppData (AppData writes of a packaged app are virtualized).
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'msix sideload test'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+
+          # 1) AUMID activation with arguments: packaged identity + data folder + LibreOffice lookup.
+          $report = Join-Path $dir 'self-check.json'
+          $procId = [RcActivate]::Launch($env:RC_AUMID, "--self-check `"$report`"")
+          Write-Host "Activated self-check, pid $procId"
+          if (-not (Wait-File $report 90)) { throw 'Self-check report was not written by the packaged app' }
+          $facts = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          $facts | Format-List
+          if (-not $facts.packaged) { throw 'App does not detect that it runs packaged' }
+          if ($facts.package_family_name -ne $env:EXPECTED_PFN) { throw "package_family_name $($facts.package_family_name)" }
+          if (-not $facts.technical_log_written) { throw 'Packaged app could not write its technical log' }
+          if (-not $facts.executable.StartsWith($env:RC_INSTALL, [StringComparison]::OrdinalIgnoreCase)) { throw "Unexpected executable $($facts.executable)" }
+          Copy-Item $report .\msix-store\out\self-check.json
+
+          # 2) GUI start via AUMID (no arguments): the window process must stay up.
+          $guiPid = [RcActivate]::Launch($env:RC_AUMID, '')
+          Start-Sleep -Seconds 12
+          $gui = Get-Process -Id $guiPid -ErrorAction SilentlyContinue
+          if (-not $gui) { throw 'RightConvert GUI exited right after launch' }
+          Write-Host "GUI running: pid $guiPid, window '$($gui.MainWindowTitle)'"
+          Stop-Process -Id $guiPid -Force
+
+          # 3) CLI --direct conversion via AUMID activation.
+          $png = Join-Path $dir 'a b.png'
+          python -c "import sys; from PIL import Image; Image.new('RGB',(20,10),(1,2,3)).save(sys.argv[1])" $png
+          [void][RcActivate]::Launch($env:RC_AUMID, "--files `"$png`" --target webp --direct")
+          if (-not (Wait-File (Join-Path $dir 'a b.webp') 90)) { throw 'AUMID --direct conversion produced no webp' }
+          Write-Host 'PASS: AUMID --direct png -> webp'
+
+          # 4) CLI conversion through the app execution alias (RightConvert.exe on PATH).
+          $alias = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\RightConvert.exe'
+          if (-not (Test-Path -LiteralPath $alias)) { throw "Execution alias missing: $alias" }
+          $proc = Start-Process -FilePath $alias -ArgumentList @('--files', ('"' + $png + '"'), '--target', 'jpg', '--direct') -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { throw "alias --direct exit code $($proc.ExitCode)" }
+          if (-not (Wait-File (Join-Path $dir 'a b.jpg') 30)) { throw 'alias --direct conversion produced no jpg' }
+          Write-Host 'PASS: execution alias --direct png -> jpg'
+
+      - name: Windows 11 menu COM class resolves from the package (diagnostic)
+        continue-on-error: true
+        shell: powershell
+        run: |
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          [ComImport, Guid("a08ce4d0-fa25-44ab-b57c-c7b1c323e0b9"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+          public interface IExplorerCommandTitle {
+              [PreserveSig] int GetTitle(IntPtr items, out IntPtr name);
+          }
+          public static class RcCom {
+              public static string Title() {
+                  Type type = Type.GetTypeFromCLSID(new Guid("AA7FB3F0-5E6C-4D75-A22F-C0A8D7A63211"), true);
+                  object instance = Activator.CreateInstance(type);
+                  IntPtr text;
+                  int hr = ((IExplorerCommandTitle)instance).GetTitle(IntPtr.Zero, out text);
+                  if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                  string result = Marshal.PtrToStringUni(text);
+                  Marshal.FreeCoTaskMem(text);
+                  return result;
+              }
+          }
+          '@
+          $title = [RcCom]::Title()
+          Write-Host "IExplorerCommand title via packaged COM surrogate: $title"
+          if ($title -ne 'Convert with RightConvert') { throw "Unexpected title $title" }
+
+      - name: Uninstall the sideloaded package
+        if: always()
+        shell: powershell
+        run: |
+          Get-Process RightConvert -ErrorAction SilentlyContinue | Stop-Process -Force
+          $pkg = Get-AppxPackage -Name Kodji.RightConvert
+          if ($pkg) { Remove-AppxPackage -Package $pkg.PackageFullName }
+          if (Get-AppxPackage -Name Kodji.RightConvert) { throw 'Package still installed after Remove-AppxPackage' }
+          Write-Host 'Uninstalled cleanly'
+
+      - name: Windows App Certification Kit (if present on the runner)
+        id: wack
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          $appcert = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\App Certification Kit\appcert.exe'
+          if (-not (Test-Path -LiteralPath $appcert)) { Write-Warning "WACK not installed on this runner: $appcert"; "result=NOT_AVAILABLE" >> $env:GITHUB_OUTPUT; exit 0 }
+          $test = Resolve-Path ".\msix-store\out\RightConvert_${env:PACKAGE_VERSION}_x64.test.msix"
+          $report = Join-Path $PWD 'msix-store\out\wack-report.xml'
+          & $appcert reset
+          & $appcert test -appxpackagepath $test -reportoutputpath $report
+          Write-Host "appcert exit code: $LASTEXITCODE"
+          if (-not (Test-Path $report)) { throw 'WACK produced no report' }
+          [xml]$r = Get-Content $report -Raw
+          $overall = $r.REPORT.OVERALL_RESULT
+          Write-Host "WACK OVERALL_RESULT: $overall"
+          foreach ($t in $r.SelectNodes('//TEST')) {
+            $res = $t.RESULT.'#cdata-section'; if (-not $res) { $res = $t.RESULT.InnerText }
+            if ($res -and $res -ne 'PASS') { Write-Host "  [$res] $($t.NAME)"; foreach ($m in $t.SelectNodes('.//MESSAGE')) { Write-Host "      $($m.TEXT)" } }
+          }
+          "result=$overall" >> $env:GITHUB_OUTPUT
+          if ($overall -ne 'PASS') { throw "WACK result: $overall" }
+
+      - name: Remove the test certificate
+        if: always()
+        run: |
+          Get-ChildItem Cert:\LocalMachine\TrustedPeople, Cert:\CurrentUser\My |
+            Where-Object FriendlyName -eq 'RightConvert Store sideload TEST ONLY' | Remove-Item -Force -ErrorAction SilentlyContinue
+
+      - name: Upload the Store submission file (.msixupload)
+        uses: actions/upload-artifact@v4
+        with:
+          name: RightConvert-Store-msixupload
+          path: msix-store/out/*.msixupload
+          if-no-files-found: error
+
+      - name: Upload diagnostics (unsigned .msix, self-check, WACK report)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RightConvert-Store-diagnostics
+          path: |
+            msix-store/out/*_x64.msix
+            msix-store/out/self-check.json
+            msix-store/out/wack-report.xml
+          if-no-files-found: ignore
