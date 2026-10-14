@@ -9,25 +9,21 @@
 //       Only the registered handler class, activated through COM (HKCU
 //       registration) and initialized with the Shell's own IDataObject.
 //
-//   RightConvertMenuProbe.exe --unelevated <any of the modes above>
-//       Re-runs the probe with a standard-user (SAFER_LEVELID_NORMALUSER),
-//       medium-integrity copy of the caller's token, i.e. the token Explorer
-//       has on a normal desktop. Windows does not load shell extensions that
-//       are registered only per user (HKCU\Software\Classes) into an elevated
-//       process, so an elevated CI shell cannot see them; this mode builds the
-//       menu the way the user's Explorer does.
+//   RightConvertMenuProbe.exe --output <file> <any of the modes above>
+//       Writes everything to <file> instead of stdout (used when the probe is
+//       started as a non-elevated scheduled task, which has no console).
 //
-// Prints "TOKEN: elevated=<0|1> integrity=0x<rid>" first, then one
+// Prints "TOKEN: elevated=<0|1> integrity=0x<rid>" first (the Shell does not
+// load HKCU-only shell extensions into an elevated process), then one
 // "ITEM: <caption>" line per menu entry and "INVOKED: <caption>" after a
 // successful InvokeCommand. Never registers anything itself.
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shobjidl.h>
-#include <wincrypt.h>
-#include <winsafer.h>
 
 #include <cstdio>
+#include <io.h>
 #include <string>
 #include <vector>
 
@@ -122,23 +118,6 @@ int ListAndInvoke(IContextMenu* menu_handler, const wchar_t* invoke) {
     return result;
 }
 
-std::wstring QuoteArgument(const std::wstring& argument) {
-    std::wstring result = L"\"";
-    size_t slashes = 0;
-    for (wchar_t ch : argument) {
-        if (ch == L'\\') {
-            ++slashes;
-        } else {
-            result.append(slashes * (ch == L'"' ? 2 : 1), L'\\');
-            if (ch == L'"') result += L'\\';
-            result += ch;
-            slashes = 0;
-        }
-    }
-    result.append(slashes * 2, L'\\');
-    return result + L"\"";
-}
-
 void PrintTokenState() {
     HANDLE token = nullptr;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) return;
@@ -159,86 +138,19 @@ void PrintTokenState() {
     std::fflush(stdout);
 }
 
-// Runs this probe again, arguments after "--unelevated" unchanged, with a
-// standard-user medium-integrity restricted copy of the current token.
-int RelaunchUnelevated(int argc, wchar_t** argv) {
-    SAFER_LEVEL_HANDLE level = nullptr;
-    if (!SaferCreateLevel(SAFER_SCOPEID_USER, SAFER_LEVELID_NORMALUSER, SAFER_LEVEL_OPEN, &level, nullptr)) {
-        std::fprintf(stderr, "SaferCreateLevel failed: %lu\n", GetLastError());
-        return 30;
-    }
-    HANDLE token = nullptr;
-    const BOOL computed = SaferComputeTokenFromLevel(level, nullptr, &token, 0, nullptr);
-    const DWORD compute_error = GetLastError();
-    SaferCloseLevel(level);
-    if (!computed) {
-        std::fprintf(stderr, "SaferComputeTokenFromLevel failed: %lu\n", compute_error);
-        return 31;
-    }
-    SID_IDENTIFIER_AUTHORITY authority = SECURITY_MANDATORY_LABEL_AUTHORITY;
-    PSID medium = nullptr;
-    if (!AllocateAndInitializeSid(&authority, 1, SECURITY_MANDATORY_MEDIUM_RID,
-                                  0, 0, 0, 0, 0, 0, 0, &medium)) {
-        CloseHandle(token);
-        return 32;
-    }
-    TOKEN_MANDATORY_LABEL label{};
-    label.Label.Attributes = SE_GROUP_INTEGRITY;
-    label.Label.Sid = medium;
-    const BOOL lowered = SetTokenInformation(token, TokenIntegrityLevel, &label,
-                                             sizeof(label) + GetLengthSid(medium));
-    const DWORD lower_error = GetLastError();
-    FreeSid(medium);
-    if (!lowered) {
-        CloseHandle(token);
-        std::fprintf(stderr, "Setting medium integrity failed: %lu\n", lower_error);
-        return 33;
-    }
-    std::vector<wchar_t> self(32768);
-    const DWORD length = GetModuleFileNameW(nullptr, self.data(), static_cast<DWORD>(self.size()));
-    if (!length || length >= self.size()) {
-        CloseHandle(token);
-        return 34;
-    }
-    std::wstring command = QuoteArgument(self.data());
-    for (int index = 2; index < argc; ++index) command += L" " + QuoteArgument(argv[index]);
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    startup.dwFlags = STARTF_USESTDHANDLES;
-    startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
-    startup.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-    startup.hStdError = GetStdHandle(STD_ERROR_HANDLE);
-    for (HANDLE handle : {startup.hStdInput, startup.hStdOutput, startup.hStdError}) {
-        if (handle && handle != INVALID_HANDLE_VALUE)
-            SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
-    }
-    std::fflush(stdout);
-    std::fflush(stderr);
-    PROCESS_INFORMATION process{};
-    if (!CreateProcessAsUserW(token, self.data(), &command[0], nullptr, nullptr, TRUE, 0,
-                              nullptr, nullptr, &startup, &process)) {
-        const DWORD error = GetLastError();
-        CloseHandle(token);
-        std::fprintf(stderr, "CreateProcessAsUserW (standard user) failed: %lu\n", error);
-        return 35;
-    }
-    CloseHandle(token);
-    CloseHandle(process.hThread);
-    DWORD code = 36;
-    if (WaitForSingleObject(process.hProcess, 180000) == WAIT_OBJECT_0) {
-        GetExitCodeProcess(process.hProcess, &code);
-    } else {
-        TerminateProcess(process.hProcess, 37);
-        std::fprintf(stderr, "Standard-user probe timed out\n");
-    }
-    CloseHandle(process.hProcess);
-    return static_cast<int>(code);
-}
-
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
-    if (argc >= 3 && wcscmp(argv[1], L"--unelevated") == 0) return RelaunchUnelevated(argc, argv);
+    if (argc >= 3 && wcscmp(argv[1], L"--output") == 0) {
+        // For hosts without a console/pipe (a scheduled task): write all
+        // output, UTF-8, to the named file and parse the remaining arguments.
+        FILE* redirected = nullptr;
+        if (_wfreopen_s(&redirected, argv[2], L"w", stdout) != 0) return 3;
+        std::setvbuf(stdout, nullptr, _IONBF, 0);
+        _dup2(_fileno(stdout), _fileno(stderr));
+        argc -= 2;
+        argv += 2;
+    }
     PrintTokenState();
     if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) return 2;
     int result = 1;

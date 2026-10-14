@@ -9,8 +9,8 @@
 #     drives Setup's own unpack_payload() + powershell_install() code path.
 #  2. Verifies files, the classic verb, COM classes, quick-menu handler and the
 #     Programs and Features entry, then activates the COM class via registry.
-#  3. Builds Explorer's complete item menu of a file (native probe) with a
-#     standard-user token and invokes "Convert to webp" through it.
+#  3. Builds Explorer's complete item menu of a file (native probe) as the same
+#     user without elevation and invokes "Convert to webp" through it.
 #  4. Runs the registered UninstallString and verifies everything is removed.
 [CmdletBinding()]
 param(
@@ -149,6 +149,42 @@ print("SETUP_INSTALL_OK")
         $lines | ForEach-Object { Write-Host "  [$($Arguments[0])] $_" }
         return [pscustomobject]@{ Code = $code; Items = @($lines | Where-Object { $_ -like 'ITEM: *' } | ForEach-Object { $_.Substring(6) }); Lines = $lines }
     }
+    # Runs the probe as the same user WITHOUT elevation, i.e. with the token
+    # Explorer has on a customer desktop (UAC filtered, medium integrity): a
+    # temporary S4U scheduled task with RunLevel Limited. Output goes to a file.
+    function Invoke-MenuProbeStandardUser {
+        param([string[]]$Arguments)
+        $name = 'RightConvertE2EProbe-' + [guid]::NewGuid().ToString('N')
+        $outFile = Join-Path $work ($name + '.txt')
+        $quoted = @(@('--output', $outFile) + $Arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $action = New-ScheduledTaskAction -Execute $menuProbe -Argument $quoted -WorkingDirectory $work
+        $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType S4U -RunLevel Limited
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+            -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+        Register-ScheduledTask -TaskName $name -Action $action -Principal $principal -Settings $settings | Out-Null
+        try {
+            Start-ScheduledTask -TaskName $name
+            $deadline = (Get-Date).AddSeconds(120)
+            do {
+                Start-Sleep -Milliseconds 500
+                $info = Get-ScheduledTaskInfo -TaskName $name
+                $state = (Get-ScheduledTask -TaskName $name).State
+                if ((Get-Date) -gt $deadline) { throw "Standard-user probe task did not finish (state $state)" }
+            } while ($state -eq 'Running' -or $info.LastTaskResult -eq 267011 -or $info.LastTaskResult -eq 267009)
+            $code = [int]$info.LastTaskResult
+        } finally {
+            Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
+        }
+        $lines = @()
+        if (Test-Path -LiteralPath $outFile) {
+            $lines = @([IO.File]::ReadAllLines($outFile, (New-Object Text.UTF8Encoding($false))))
+            Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
+        }
+        $lines | ForEach-Object { Write-Host "  [standard-user $($Arguments[0])] $_" }
+        Write-Host "  [standard-user $($Arguments[0])] exit code $code"
+        return [pscustomobject]@{ Code = $code; Items = @($lines | Where-Object { $_ -like 'ITEM: *' } | ForEach-Object { $_.Substring(6) }); Lines = $lines }
+    }
     # The registered handler alone: activated via HKCU COM registration.
     $handler = Invoke-MenuProbe @('--handler', $script:RightConvertQuickCascadeClsid, $image)
     if ($handler.Code -ne 0) { throw "Registered quick-menu handler failed: exit $($handler.Code)" }
@@ -199,9 +235,9 @@ print("SETUP_INSTALL_OK")
     #     shell extensions registered solely per user (HKCU\Software\Classes)
     #     into elevated processes, so per-user handlers are expected to be
     #     absent here while per-machine ones (7-Zip) and static verbs load;
-    #  b) with a standard-user, medium-integrity token: the token Explorer has
-    #     on a customer desktop. This is the asserted path, including invoking
-    #     a quick conversion through the complete Shell menu.
+    #  b) as the same user without elevation (UAC-filtered, medium integrity):
+    #     the token Explorer has on a customer desktop. This is the asserted
+    #     path, including invoking a quick conversion through the Shell menu.
     $elevatedMenu = Invoke-MenuProbe @('--shell', $image)
     if ($elevatedMenu.Code -ne 0) { throw "Elevated Shell item menu probe failed: exit $($elevatedMenu.Code)" }
     if ($elevatedMenu.Items -notcontains 'Convert with RightConvert') {
@@ -212,8 +248,10 @@ print("SETUP_INSTALL_OK")
     $os = Get-CimInstance Win32_OperatingSystem
     $lua = (Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name EnableLUA -ErrorAction SilentlyContinue).EnableLUA
     Write-Host "Host: $($os.Caption) $($os.Version) ProductType=$($os.ProductType) EnableLUA=$lua"
+    Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue |
+        ForEach-Object { Write-Host "explorer.exe pid=$($_.ProcessId) session=$($_.SessionId)" }
 
-    $shellMenu = Invoke-MenuProbe @('--unelevated', '--shell', $image)
+    $shellMenu = Invoke-MenuProbeStandardUser @('--shell', $image)
     if ($shellMenu.Code -ne 0) { throw "Standard-user Shell item menu probe failed: exit $($shellMenu.Code)" }
     if (-not ($shellMenu.Lines -contains 'TOKEN: elevated=0 integrity=0x2000')) {
         throw "The standard-user Shell probe did not run unelevated at medium integrity: $($shellMenu.Lines | Where-Object { $_ -like 'TOKEN: *' })"
@@ -235,7 +273,7 @@ print("SETUP_INSTALL_OK")
         throw 'Shell item menu offers a same-format "Convert to png" for a PNG'
     }
     # Click "Convert to webp" in Explorer's item menu (standard-user token).
-    $shellMenu = Invoke-MenuProbe @('--unelevated', '--shell', $image, 'Convert to webp')
+    $shellMenu = Invoke-MenuProbeStandardUser @('--shell', $image, 'Convert to webp')
     if ($shellMenu.Code -ne 0 -or -not ($shellMenu.Lines -contains 'INVOKED: Convert to webp')) {
         throw "Shell item context menu could not invoke the native 'Convert to webp': exit $($shellMenu.Code)"
     }
