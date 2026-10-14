@@ -12,20 +12,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install FFmpeg (needed by the live Stage6 matrix)
+      - name: Install FFmpeg (pinned real binaries, SHA-256 verified)
         run: |
-          # The community feed has transient outages (HTTP 406/503): retry.
-          foreach ($attempt in 1..4) {
-            choco install ffmpeg -y --no-progress
-            if ($LASTEXITCODE -eq 0) { break }
-            if ($attempt -eq 4) { throw "choco install ffmpeg failed" }
-            Start-Sleep -Seconds (20 * $attempt)
+          # Pinned gyan.dev "essentials" build fetched directly: the Chocolatey
+          # community feed has outages (HTTP 406) that broke CI. Real
+          # binaries, no launcher shims.
+          $version = '9.0.2'
+          $sha256 = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg-$version-essentials_build.zip"
+          $urls = @(
+            "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$version-essentials_build.zip",
+            "https://github.com/GyanD/codexffmpeg/releases/download/$version/ffmpeg-$version-essentials_build.zip"
+          )
+          foreach ($url in $urls) {
+            try { Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing; if ((Get-FileHash $zip -Algorithm SHA256).Hash -eq $sha256) { break } } catch { Write-Warning "$url : $_" }
           }
-          # Put the real ffmpeg.exe/ffprobe.exe ahead of Chocolatey's shims:
-          # terminating a shim on cancel leaves its child ffmpeg running and
-          # holding the partial output file open.
-          $bin = (Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
-          if (-not $bin) { throw "real ffmpeg.exe not found" }
+          $actual = (Get-FileHash $zip -Algorithm SHA256).Hash
+          if ($actual -ne $sha256) { throw "FFmpeg archive SHA-256 mismatch: $actual" }
+          $root = Join-Path $env:RUNNER_TEMP 'ffmpeg'
+          Expand-Archive -LiteralPath $zip -DestinationPath $root -Force
+          $bin = (Get-ChildItem $root -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
+          if (-not $bin -or -not (Test-Path (Join-Path $bin 'ffprobe.exe'))) { throw "ffmpeg.exe/ffprobe.exe not found" }
           Add-Content -Path $env:GITHUB_PATH -Value $bin
           & "$bin\ffmpeg.exe" -version
           & "$bin\ffprobe.exe" -version
