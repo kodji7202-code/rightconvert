@@ -9,12 +9,9 @@
 //       Only the registered handler class, activated through COM (HKCU
 //       registration) and initialized with the Shell's own IDataObject.
 //
-//   RightConvertMenuProbe.exe --output <file> <any of the modes above>
-//       Writes everything to <file> instead of stdout (used when the probe is
-//       started as a non-elevated scheduled task, which has no console).
-//
-// Prints "TOKEN: elevated=<0|1> integrity=0x<rid>" first (the Shell does not
-// load HKCU-only shell extensions into an elevated process), then one
+// Prints "TOKEN: elevated=<0|1> integrity=0x<rid> type=<elevation type>"
+// first (the Shell does not load HKCU-only shell extensions into an elevated
+// process, so this tells which kind of Explorer the result matches), then one
 // "ITEM: <caption>" line per menu entry and "INVOKED: <caption>" after a
 // successful InvokeCommand. Never registers anything itself.
 #include <windows.h>
@@ -23,7 +20,6 @@
 #include <shobjidl.h>
 
 #include <cstdio>
-#include <io.h>
 #include <string>
 #include <vector>
 
@@ -124,6 +120,8 @@ void PrintTokenState() {
     TOKEN_ELEVATION elevation{};
     DWORD size = 0;
     const BOOL have_elevation = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &size);
+    TOKEN_ELEVATION_TYPE type = TokenElevationTypeDefault;
+    const BOOL have_type = GetTokenInformation(token, TokenElevationType, &type, sizeof(type), &size);
     alignas(TOKEN_MANDATORY_LABEL) BYTE buffer[256]{};
     DWORD integrity = 0;
     if (GetTokenInformation(token, TokenIntegrityLevel, buffer, sizeof(buffer), &size)) {
@@ -132,25 +130,17 @@ void PrintTokenState() {
         if (count) integrity = *GetSidSubAuthority(label->Label.Sid, count - 1u);
     }
     CloseHandle(token);
-    std::printf("TOKEN: elevated=%s integrity=0x%04lx\n",
+    // type: 1 = no split token (UAC not filtering this logon), 2 = full
+    // (elevated half of a split token), 3 = limited (UAC-filtered).
+    std::printf("TOKEN: elevated=%s integrity=0x%04lx type=%d\n",
                 have_elevation ? (elevation.TokenIsElevated ? "1" : "0") : "?",
-                static_cast<unsigned long>(integrity));
+                static_cast<unsigned long>(integrity), have_type ? static_cast<int>(type) : 0);
     std::fflush(stdout);
 }
 
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
-    if (argc >= 3 && wcscmp(argv[1], L"--output") == 0) {
-        // For hosts without a console/pipe (a scheduled task): write all
-        // output, UTF-8, to the named file and parse the remaining arguments.
-        FILE* redirected = nullptr;
-        if (_wfreopen_s(&redirected, argv[2], L"w", stdout) != 0) return 3;
-        std::setvbuf(stdout, nullptr, _IONBF, 0);
-        _dup2(_fileno(stdout), _fileno(stderr));
-        argc -= 2;
-        argv += 2;
-    }
     PrintTokenState();
     if (FAILED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED))) return 2;
     int result = 1;

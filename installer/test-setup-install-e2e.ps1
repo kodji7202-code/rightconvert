@@ -9,8 +9,9 @@
 #     drives Setup's own unpack_payload() + powershell_install() code path.
 #  2. Verifies files, the classic verb, COM classes, quick-menu handler and the
 #     Programs and Features entry, then activates the COM class via registry.
-#  3. Builds Explorer's complete item menu of a file (native probe) as the same
-#     user without elevation and invokes "Convert to webp" through it.
+#  3. Activates the quick-menu handler through its registration and converts;
+#     then a temporary *standard* local user installs per user, builds
+#     Explorer's complete item menu and invokes "Convert to webp" through it.
 #  4. Runs the registered UninstallString and verifies everything is removed.
 [CmdletBinding()]
 param(
@@ -149,42 +150,6 @@ print("SETUP_INSTALL_OK")
         $lines | ForEach-Object { Write-Host "  [$($Arguments[0])] $_" }
         return [pscustomobject]@{ Code = $code; Items = @($lines | Where-Object { $_ -like 'ITEM: *' } | ForEach-Object { $_.Substring(6) }); Lines = $lines }
     }
-    # Runs the probe as the same user WITHOUT elevation, i.e. with the token
-    # Explorer has on a customer desktop (UAC filtered, medium integrity): a
-    # temporary S4U scheduled task with RunLevel Limited. Output goes to a file.
-    function Invoke-MenuProbeStandardUser {
-        param([string[]]$Arguments)
-        $name = 'RightConvertE2EProbe-' + [guid]::NewGuid().ToString('N')
-        $outFile = Join-Path $work ($name + '.txt')
-        $quoted = @(@('--output', $outFile) + $Arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
-        $identity = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-        $action = New-ScheduledTaskAction -Execute $menuProbe -Argument $quoted -WorkingDirectory $work
-        $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType S4U -RunLevel Limited
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-            -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
-        Register-ScheduledTask -TaskName $name -Action $action -Principal $principal -Settings $settings | Out-Null
-        try {
-            Start-ScheduledTask -TaskName $name
-            $deadline = (Get-Date).AddSeconds(120)
-            do {
-                Start-Sleep -Milliseconds 500
-                $info = Get-ScheduledTaskInfo -TaskName $name
-                $state = (Get-ScheduledTask -TaskName $name).State
-                if ((Get-Date) -gt $deadline) { throw "Standard-user probe task did not finish (state $state)" }
-            } while ($state -eq 'Running' -or $info.LastTaskResult -eq 267011 -or $info.LastTaskResult -eq 267009)
-            $code = [int]$info.LastTaskResult
-        } finally {
-            Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
-        }
-        $lines = @()
-        if (Test-Path -LiteralPath $outFile) {
-            $lines = @([IO.File]::ReadAllLines($outFile, (New-Object Text.UTF8Encoding($false))))
-            Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
-        }
-        $lines | ForEach-Object { Write-Host "  [standard-user $($Arguments[0])] $_" }
-        Write-Host "  [standard-user $($Arguments[0])] exit code $code"
-        return [pscustomobject]@{ Code = $code; Items = @($lines | Where-Object { $_ -like 'ITEM: *' } | ForEach-Object { $_.Substring(6) }); Lines = $lines }
-    }
     # The registered handler alone: activated via HKCU COM registration.
     $handler = Invoke-MenuProbe @('--handler', $script:RightConvertQuickCascadeClsid, $image)
     if ($handler.Code -ne 0) { throw "Registered quick-menu handler failed: exit $($handler.Code)" }
@@ -230,61 +195,188 @@ print("SETUP_INSTALL_OK")
     }
     Write-Host "Handler-invoked conversion OK: $tiff"
 
-    # Explorer's complete item menu (IShellFolder::GetUIObjectOf), built twice:
-    #  a) in this elevated CI process: diagnostic only. Windows does not load
-    #     shell extensions registered solely per user (HKCU\Software\Classes)
-    #     into elevated processes, so per-user handlers are expected to be
-    #     absent here while per-machine ones (7-Zip) and static verbs load;
-    #  b) as the same user without elevation (UAC-filtered, medium integrity):
-    #     the token Explorer has on a customer desktop. This is the asserted
-    #     path, including invoking a quick conversion through the Shell menu.
+    # Explorer's complete item menu (IShellFolder::GetUIObjectOf).
+    #  a) In this CI process, diagnostic only. The hosted runner's account has
+    #     no UAC split token (TokenElevationType 1), so this process -- and
+    #     even its Explorer -- is elevated. Windows does not load shell
+    #     extensions registered only per user (HKCU\Software\Classes) into an
+    #     elevated process: static verbs and per-machine handlers (7-Zip) load,
+    #     per-user IContextMenu handlers do not. A SAFER normal-user token and
+    #     an S4U "Limited" task were tried and still report TokenIsElevated=1.
+    #  b) A genuine standard user (temporary local account, medium integrity):
+    #     the token Explorer has on a customer desktop. It runs its own
+    #     per-user install.ps1 (the code Setup delegates to), builds the full
+    #     item menu, clicks "Convert to webp", and uninstalls via its own
+    #     UninstallString. This is the asserted Shell path.
     $elevatedMenu = Invoke-MenuProbe @('--shell', $image)
     if ($elevatedMenu.Code -ne 0) { throw "Elevated Shell item menu probe failed: exit $($elevatedMenu.Code)" }
     if ($elevatedMenu.Items -notcontains 'Convert with RightConvert') {
-        throw 'Elevated Shell item context menu does not offer "Convert with RightConvert"'
+        throw 'Shell item context menu does not offer "Convert with RightConvert"'
     }
     $elevatedToken = @($elevatedMenu.Lines | Where-Object { $_ -like 'TOKEN: *' }) -join ' '
     Write-Host "Elevated Shell host ($elevatedToken): per-user quick items present = $($elevatedMenu.Items -contains 'Convert to webp')"
     $os = Get-CimInstance Win32_OperatingSystem
     $lua = (Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System' -Name EnableLUA -ErrorAction SilentlyContinue).EnableLUA
     Write-Host "Host: $($os.Caption) $($os.Version) ProductType=$($os.ProductType) EnableLUA=$lua"
-    Get-CimInstance Win32_Process -Filter "Name='explorer.exe'" -ErrorAction SilentlyContinue |
-        ForEach-Object { Write-Host "explorer.exe pid=$($_.ProcessId) session=$($_.SessionId)" }
 
-    $shellMenu = Invoke-MenuProbeStandardUser @('--shell', $image)
-    if ($shellMenu.Code -ne 0) { throw "Standard-user Shell item menu probe failed: exit $($shellMenu.Code)" }
-    if (-not ($shellMenu.Lines -contains 'TOKEN: elevated=0 integrity=0x2000')) {
-        throw "The standard-user Shell probe did not run unelevated at medium integrity: $($shellMenu.Lines | Where-Object { $_ -like 'TOKEN: *' })"
+    $stdShared = Join-Path $env:SystemDrive ('RightConvertE2E-' + [guid]::NewGuid().ToString('N'))
+    $stdName = 'rce2e' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+    $stdUser = $null
+    try {
+        New-Item -ItemType Directory -Path $stdShared | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $stdShared 'results') | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $stdShared 'installer') | Out-Null
+        Copy-Item -LiteralPath $PackageDir -Destination (Join-Path $stdShared 'pkg') -Recurse
+        Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1' -File |
+            ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $stdShared 'installer') }
+        Copy-Item -LiteralPath $menuProbe -Destination (Join-Path $stdShared 'RightConvertMenuProbe.exe')
+        Copy-Item -LiteralPath $image -Destination (Join-Path $stdShared 'probe.png')
+        [IO.File]::WriteAllText((Join-Path $stdShared 'std-user.ps1'), @'
+$ErrorActionPreference = 'Stop'
+$shared = $PSScriptRoot
+$log = Join-Path $shared 'results\log.txt'
+function Log([string]$Text) { [IO.File]::AppendAllText($log, $Text + "`r`n", (New-Object Text.UTF8Encoding($false))) }
+$ps = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+try {
+    Log ('USER: ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name)
+    # Start-Process -Credential may hand over the launching admin's variables;
+    # use this account's own folders, as an Explorer-started app would.
+    $env:USERPROFILE = [Environment]::GetFolderPath('UserProfile')
+    $env:APPDATA = [Environment]::GetFolderPath('ApplicationData')
+    $env:LOCALAPPDATA = [Environment]::GetFolderPath('LocalApplicationData')
+    $env:TEMP = Join-Path $env:LOCALAPPDATA 'Temp'
+    $env:TMP = $env:TEMP
+    New-Item -ItemType Directory -Path $env:TEMP -Force | Out-Null
+    Log "LOCALAPPDATA: $env:LOCALAPPDATA"
+    . (Join-Path $shared 'installer\common.ps1')
+    $ErrorActionPreference = 'Continue'
+    $out = @(& $ps -NoProfile -ExecutionPolicy Bypass -File (Join-Path $shared 'installer\install.ps1') -PackageDir (Join-Path $shared 'pkg') 2>&1 | ForEach-Object { "$_" })
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    $out | ForEach-Object { Log "install: $_" }
+    if ($code -ne 0) { throw "install.ps1 exit $code" }
+    $exe = Join-Path (Join-Path (Get-RightConvertRoot) 'app') 'RightConvert.exe'
+    if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Not installed: $exe" }
+    Log 'INSTALL_OK'
+    $dir = Join-Path $env:TEMP ('rc std ' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    $image = Join-Path $dir 'probe image.png'
+    Copy-Item -LiteralPath (Join-Path $shared 'probe.png') -Destination $image
+    $probe = Join-Path $shared 'RightConvertMenuProbe.exe'
+    foreach ($invoke in @('', 'Convert to webp')) {
+        $probeArgs = @('--shell', $image)
+        if ($invoke) { $probeArgs += $invoke }
+        $ErrorActionPreference = 'Continue'
+        $lines = @(& $probe @probeArgs 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        $lines | ForEach-Object { Log $_ }
+        Log "PROBE_EXIT $code"
     }
-    if ($shellMenu.Items -notcontains 'Convert with RightConvert') {
-        throw 'Shell item context menu does not offer "Convert with RightConvert"'
+    $webp = Join-Path $dir 'probe image.webp'
+    $deadline = (Get-Date).AddSeconds(60)
+    while (-not (Test-Path -LiteralPath $webp -PathType Leaf)) {
+        if ((Get-Date) -gt $deadline) { throw "Context-menu conversion produced no output: $webp" }
+        Start-Sleep -Milliseconds 250
     }
-    foreach ($caption in $expectedImageTargets) {
-        if ($shellMenu.Items -notcontains $caption) {
-            foreach ($hive in @('HKLM:', 'HKCU:')) {
-                $value = (Get-ItemProperty -Path "$hive\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer" `
-                          -Name EnforceShellExtensionSecurity -ErrorAction SilentlyContinue).EnforceShellExtensionSecurity
-                Write-Host "Policy $hive EnforceShellExtensionSecurity = $value"
-            }
-            throw "The standard-user Shell item menu did not load the per-user RightConvertQuick handler ('$caption' missing)"
-        }
+    $deadline = (Get-Date).AddSeconds(60)
+    while (@(Get-Process -Name 'RightConvert' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }).Count -gt 0) {
+        if ((Get-Date) -gt $deadline) { throw 'RightConvert --direct did not exit' }
+        Start-Sleep -Milliseconds 250
     }
-    if (@($shellMenu.Items | Where-Object { $_ -eq 'Convert to png' }).Count -ne 0) {
-        throw 'Shell item menu offers a same-format "Convert to png" for a PNG'
-    }
-    # Click "Convert to webp" in Explorer's item menu (standard-user token).
-    $shellMenu = Invoke-MenuProbeStandardUser @('--shell', $image, 'Convert to webp')
-    if ($shellMenu.Code -ne 0 -or -not ($shellMenu.Lines -contains 'INVOKED: Convert to webp')) {
-        throw "Shell item context menu could not invoke the native 'Convert to webp': exit $($shellMenu.Code)"
-    }
-    $converted = Join-Path $probeDir 'probe image.webp'
-    Wait-Output $converted
-    $header = [IO.File]::ReadAllBytes($converted)[0..11]
+    $header = [IO.File]::ReadAllBytes($webp)[0..11]
     if ([Text.Encoding]::ASCII.GetString($header, 0, 4) -ne 'RIFF' -or
-        [Text.Encoding]::ASCII.GetString($header, 8, 4) -ne 'WEBP') {
-        throw 'Context-menu output is not a WebP file'
+        [Text.Encoding]::ASCII.GetString($header, 8, 4) -ne 'WEBP') { throw 'Context-menu output is not a WebP file' }
+    Log 'WEBP_OK'
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($script:RightConvertUninstallKey)
+    if ($null -eq $key) { throw 'No Programs and Features entry' }
+    try { $uninstallString = $key.GetValue('UninstallString') } finally { $key.Close() }
+    if ($uninstallString -notmatch '^"([^"]+)" (.+)$') { throw "Unexpected UninstallString: $uninstallString" }
+    $proc = Start-Process -FilePath $Matches[1] -ArgumentList $Matches[2] -Wait -PassThru
+    Log "UNINSTALL_EXIT $($proc.ExitCode)"
+    foreach ($relative in @($script:RightConvertVerbKey, $script:RightConvertUninstallKey,
+                            $script:RightConvertClassicKey, $script:RightConvertQuickHandlerKey,
+                            ('Software\Classes\CLSID\' + $script:RightConvertQuickCascadeClsid))) {
+        $left = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($relative)
+        if ($null -ne $left) { $left.Close(); throw "Registry key still present: HKCU\$relative" }
     }
-    Write-Host "Context-menu conversion OK: $converted"
+    if (Test-Path -LiteralPath (Split-Path -Parent $exe)) { throw 'Application folder was not removed' }
+    Log 'UNINSTALL_OK'
+    Log 'STD_USER_DONE'
+} catch {
+    Log ('STD_USER_ERROR: ' + ($_ | Out-String))
+    exit 1
+}
+'@, (New-Object Text.UTF8Encoding($true)))
+
+        $plain = 'Rc#' + [guid]::NewGuid().ToString('N') + 'aZ9'
+        $secure = ConvertTo-SecureString $plain -AsPlainText -Force
+        $stdUser = New-LocalUser -Name $stdName -Password $secure -PasswordNeverExpires -AccountNeverExpires `
+            -Description 'RightConvert e2e standard user (temporary)'
+        Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $stdName
+        & icacls.exe $stdShared /grant "${stdName}:(OI)(CI)RX" | Out-Null
+        & icacls.exe (Join-Path $stdShared 'results') /grant "${stdName}:(OI)(CI)M" | Out-Null
+        $stdArgs = '-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path $stdShared 'std-user.ps1') + '"'
+        $ran = $false
+        try {
+            $cred = New-Object Management.Automation.PSCredential((".\" + $stdName), $secure)
+            $proc = Start-Process -FilePath $powershell -ArgumentList $stdArgs -Credential $cred -LoadUserProfile `
+                -WorkingDirectory $stdShared -Wait -PassThru -ErrorAction Stop
+            Write-Host "Standard user ran via Start-Process -Credential: exit $($proc.ExitCode)"
+            $ran = $true
+        } catch {
+            Write-Host "Start-Process -Credential unavailable here ($($_.Exception.Message)); using a scheduled task"
+        }
+        if (-not $ran) {
+            $task = 'RightConvertE2E-' + $stdName
+            $action = New-ScheduledTaskAction -Execute $powershell -Argument $stdArgs -WorkingDirectory $stdShared
+            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+                -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+            Register-ScheduledTask -TaskName $task -Action $action -Settings $settings -User ("$env:COMPUTERNAME\$stdName") `
+                -Password $plain -RunLevel Limited | Out-Null
+            try {
+                Start-ScheduledTask -TaskName $task
+                $deadline = (Get-Date).AddMinutes(5)
+                do {
+                    Start-Sleep -Seconds 1
+                    $info = Get-ScheduledTaskInfo -TaskName $task
+                    $state = (Get-ScheduledTask -TaskName $task).State
+                    if ((Get-Date) -gt $deadline) { throw "Standard-user task did not finish (state $state)" }
+                } while ($state -eq 'Running' -or $info.LastTaskResult -eq 267011 -or $info.LastTaskResult -eq 267009)
+                Write-Host "Standard user ran via scheduled task: result $($info.LastTaskResult)"
+            } finally {
+                Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+            }
+        }
+        $stdLog = Join-Path $stdShared 'results\log.txt'
+        $stdLines = @()
+        if (Test-Path -LiteralPath $stdLog) { $stdLines = @([IO.File]::ReadAllLines($stdLog, [Text.Encoding]::UTF8)) }
+        $stdLines | ForEach-Object { Write-Host "  [standard user] $_" }
+        $tokens = @($stdLines | Where-Object { $_ -like 'TOKEN: *' })
+        if ($tokens.Count -ne 2 -or @($tokens | Where-Object { $_ -notlike 'TOKEN: elevated=0 integrity=0x2000 *' }).Count) {
+            throw "The standard-user Shell probe did not run unelevated at medium integrity: $($tokens -join ' | ')"
+        }
+        foreach ($line in @('INSTALL_OK', 'ITEM: Convert with RightConvert', 'INVOKED: Convert to webp', 'WEBP_OK',
+                            'UNINSTALL_EXIT 0', 'UNINSTALL_OK', 'STD_USER_DONE')) {
+            if ($stdLines -notcontains $line) { throw "Standard user: '$line' missing (see log above)" }
+        }
+        if (@($stdLines | Where-Object { $_ -eq 'PROBE_EXIT 0' }).Count -ne 2) { throw 'Standard user: a Shell menu probe failed' }
+        foreach ($caption in $expectedImageTargets) {
+            if ($stdLines -notcontains ('ITEM: ' + $caption)) {
+                throw "Explorer's item menu for a standard user did not load the per-user RightConvertQuick handler ('$caption' missing)"
+            }
+        }
+        if ($stdLines -contains 'ITEM: Convert to png') { throw 'Shell item menu offers a same-format "Convert to png" for a PNG' }
+        Write-Host 'Standard user: Explorer item menu shows the quick conversions; "Convert to webp" produced a WebP; uninstall clean'
+    } finally {
+        if ($stdUser) {
+            Remove-LocalUser -Name $stdName -ErrorAction SilentlyContinue
+            Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue |
+                Where-Object { $_.SID -eq $stdUser.SID.Value } |
+                ForEach-Object { Remove-CimInstance -InputObject $_ -ErrorAction SilentlyContinue }
+        }
+        Remove-Item -LiteralPath $stdShared -Recurse -Force -ErrorAction SilentlyContinue
+    }
 
     # Direct CLI of the installed app as well (no Shell involved).
     $proc = Start-Process -FilePath $exe -ArgumentList @('--files', ('"' + $image + '"'), '--target', 'jpg', '--direct') `
