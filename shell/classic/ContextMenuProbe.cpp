@@ -5,7 +5,7 @@
 //   RightConvertMenuProbe.exe --shell   <file> [caption-to-invoke]
 //       Full Shell item menu via IShellFolder::GetUIObjectOf(IContextMenu),
 //       so every registered static verb and shellex handler participates.
-//   RightConvertMenuProbe.exe --handler <clsid> <file>
+//   RightConvertMenuProbe.exe --handler <clsid> <file> [caption-to-invoke]
 //       Only the registered handler class, activated through COM (HKCU
 //       registration) and initialized with the Shell's own IDataObject.
 //
@@ -126,7 +126,7 @@ int wmain(int argc, wchar_t** argv) {
             result = ListAndInvoke(menu, argc >= 4 ? argv[3] : nullptr);
             menu->Release();
         }
-    } else if (argc == 4 && wcscmp(argv[1], L"--handler") == 0) {
+    } else if ((argc == 4 || argc == 5) && wcscmp(argv[1], L"--handler") == 0) {
         CLSID clsid{};
         IContextMenu* menu = nullptr;
         IShellExtInit* init = nullptr;
@@ -140,7 +140,7 @@ int wmain(int argc, wchar_t** argv) {
             std::fprintf(stderr, "Handler activation/initialization failed: 0x%08lx\n", static_cast<unsigned long>(hr));
             result = 11;
         } else {
-            result = ListAndInvoke(menu, nullptr);
+            result = ListAndInvoke(menu, argc == 5 ? argv[4] : nullptr);
         }
         if (data) data->Release();
         if (init) init->Release();
