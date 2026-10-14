@@ -26,7 +26,6 @@ OUTPUT = ROOT / "release" / "internal-preview" / f"RightConvert-{VERSION}-NOT-FO
 
 REQUIRED_NOTICES = (
     "Pillow-LICENSE.txt",
-    "NumPy-LICENSE.txt",
     "Python-LICENSE.txt",
     "PyInstaller-COPYING.txt",
     "cryptography-LICENSE.txt",
@@ -34,6 +33,29 @@ REQUIRED_NOTICES = (
     "cryptography-BSD.txt",
     "README.txt",
 )
+
+# Notices required only when the frozen bundle actually ships the package.
+# NumPy is not a RightConvert dependency; PyInstaller bundles it only when it
+# happens to be importable in the build environment (an optional import of
+# Pillow/pypdfium2). Its notice must then be present, and is otherwise absent.
+CONDITIONAL_NOTICES = {"NumPy-LICENSE.txt": "numpy"}
+
+
+def bundled_packages(bundle: Path) -> set[str]:
+    """Top-level Python packages frozen into a PyInstaller one-dir bundle."""
+    found = set()
+    for base in (bundle, bundle / "_internal"):
+        for package in CONDITIONAL_NOTICES.values():
+            if (base / package).is_dir():
+                found.add(package)
+    return found
+
+
+def required_notices(bundle: Path) -> tuple[str, ...]:
+    present = bundled_packages(bundle)
+    return REQUIRED_NOTICES + tuple(
+        name for name, package in CONDITIONAL_NOTICES.items() if package in present
+    )
 
 
 def verified_pdfium_notices(bundle: Path, notice_dir: Path) -> dict[str, Path]:
@@ -83,7 +105,7 @@ def allowed_customer_entries(installer: Path, notice_dir: Path, guide: Path) -> 
         "RightConvertSetup.exe": installer,
         "NOT-FOR-SALE-README.txt": guide,
     }
-    for name in REQUIRED_NOTICES:
+    for name in required_notices(notice_dir.parent):
         mapping[f"ThirdPartyNotices/{name}"] = notice_dir / name
     for name, path in verified_pdfium_notices(notice_dir.parent, notice_dir).items():
         mapping[f"ThirdPartyNotices/{name}"] = path
