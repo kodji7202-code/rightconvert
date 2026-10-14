@@ -137,35 +137,137 @@ print("SETUP_INSTALL_OK")
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the probe image' }
     $shellProbe = Join-Path $work 'shell-probe.ps1'
     [IO.File]::WriteAllText($shellProbe, @'
-param([string]$Clsid, [string]$Folder, [string]$Name)
+param([string]$Clsid, [string]$Path)
 $ErrorActionPreference = 'Stop'
-$type = [Type]::GetTypeFromCLSID([guid]$Clsid)
-$instance = [Activator]::CreateInstance($type)
-if ($null -eq $instance) { throw 'COM activation through HKCU registration failed' }
-[void][Runtime.InteropServices.Marshal]::ReleaseComObject($instance)
-Write-Output 'COM_ACTIVATION_OK'
-$shell = New-Object -ComObject Shell.Application
-$item = $shell.Namespace($Folder).ParseName($Name)
-if ($null -eq $item) { throw 'Shell could not parse the probe file' }
-$verbs = @($item.Verbs())
-$names = @($verbs | ForEach-Object { $_.Name -replace '&', '' })
-Write-Output ('VERBS: ' + ($names -join ' | '))
-$webp = $verbs | Where-Object { ($_.Name -replace '&', '') -eq 'Convert to webp' } | Select-Object -First 1
-if ($names -contains 'Convert with RightConvert') { Write-Output 'MAIN_VERB_OK' }
-if ($null -ne $webp) {
-    $webp.DoIt()
-    Write-Output 'QUICK_VERB_INVOKED'
+Add-Type -TypeDefinition @"
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+[ComImport, Guid("000214E6-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRcShellFolder {
+    [PreserveSig] int ParseDisplayName(IntPtr hwnd, IntPtr pbc, [MarshalAs(UnmanagedType.LPWStr)] string name, IntPtr eaten, out IntPtr pidl, IntPtr attributes);
+    [PreserveSig] int EnumObjects(IntPtr hwnd, int flags, out IntPtr enumerator);
+    [PreserveSig] int BindToObject(IntPtr pidl, IntPtr pbc, ref Guid riid, out IntPtr ppv);
+    [PreserveSig] int BindToStorage(IntPtr pidl, IntPtr pbc, ref Guid riid, out IntPtr ppv);
+    [PreserveSig] int CompareIDs(IntPtr lParam, IntPtr first, IntPtr second);
+    [PreserveSig] int CreateViewObject(IntPtr hwnd, ref Guid riid, out IntPtr ppv);
+    [PreserveSig] int GetAttributesOf(uint count, IntPtr pidls, ref uint attributes);
+    [PreserveSig] int GetUIObjectOf(IntPtr hwnd, uint count, [In] IntPtr[] pidls, ref Guid riid, IntPtr reserved, out IntPtr ppv);
 }
+[StructLayout(LayoutKind.Sequential)]
+public struct RcInvokeInfo {
+    public int cbSize; public int fMask; public IntPtr hwnd; public IntPtr lpVerb;
+    public IntPtr lpParameters; public IntPtr lpDirectory; public int nShow; public int dwHotKey; public IntPtr hIcon;
+}
+[ComImport, Guid("000214E4-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRcContextMenu {
+    [PreserveSig] int QueryContextMenu(IntPtr menu, uint index, uint first, uint last, uint flags);
+    [PreserveSig] int InvokeCommand(ref RcInvokeInfo info);
+    [PreserveSig] int GetCommandString(UIntPtr id, uint type, IntPtr reserved, IntPtr name, uint size);
+}
+[ComImport, Guid("000214E8-0000-0000-C000-000000000046"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IRcShellExtInit {
+    [PreserveSig] int Initialize(IntPtr folder, IntPtr data, IntPtr key);
+}
+public static class RcMenuProbe {
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    static extern int SHParseDisplayName(string name, IntPtr bc, out IntPtr pidl, uint sfgaoIn, out uint sfgaoOut);
+    [DllImport("shell32.dll")]
+    static extern int SHBindToParent(IntPtr pidl, ref Guid riid, out IntPtr ppv, out IntPtr last);
+    [DllImport("user32.dll")] static extern IntPtr CreatePopupMenu();
+    [DllImport("user32.dll")] static extern bool DestroyMenu(IntPtr menu);
+    [DllImport("user32.dll")] static extern int GetMenuItemCount(IntPtr menu);
+    [DllImport("user32.dll")] static extern uint GetMenuItemID(IntPtr menu, int position);
+    [DllImport("user32.dll")] static extern IntPtr GetSubMenu(IntPtr menu, int position);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    static extern int GetMenuStringW(IntPtr menu, uint item, StringBuilder text, int max, uint flags);
+    // Explorer's own item-menu flags: CMF_NORMAL | CMF_EXPLORE | CMF_CANRENAME | CMF_ITEMMENU.
+    const uint ExplorerFlags = 0x4 | 0x10 | 0x80;
+
+    static void Collect(IntPtr menu, List<KeyValuePair<uint, string>> items) {
+        int count = GetMenuItemCount(menu);
+        for (int i = 0; i < count; i++) {
+            var text = new StringBuilder(512);
+            GetMenuStringW(menu, (uint)i, text, text.Capacity, 0x400);
+            IntPtr sub = GetSubMenu(menu, i);
+            items.Add(new KeyValuePair<uint, string>(sub == IntPtr.Zero ? GetMenuItemID(menu, i) : 0xFFFFFFFF,
+                                                     text.ToString().Replace("&", "")));
+            if (sub != IntPtr.Zero) Collect(sub, items);
+        }
+    }
+    static IntPtr UiObject(string path, Guid iid) {
+        IntPtr pidl; uint ignored;
+        int hr = SHParseDisplayName(path, IntPtr.Zero, out pidl, 0, out ignored);
+        if (hr != 0) throw new COMException("SHParseDisplayName", hr);
+        Guid folderIid = typeof(IRcShellFolder).GUID;
+        IntPtr folderPtr, last;
+        hr = SHBindToParent(pidl, ref folderIid, out folderPtr, out last);
+        if (hr != 0) throw new COMException("SHBindToParent", hr);
+        var folder = (IRcShellFolder)Marshal.GetObjectForIUnknown(folderPtr);
+        IntPtr result;
+        hr = folder.GetUIObjectOf(IntPtr.Zero, 1, new[] { last }, ref iid, IntPtr.Zero, out result);
+        if (hr != 0) throw new COMException("GetUIObjectOf", hr);
+        return result;
+    }
+    static string Run(IRcContextMenu menuHandler, string invokeText, out bool invoked) {
+        invoked = false;
+        IntPtr menu = CreatePopupMenu();
+        try {
+            int hr = menuHandler.QueryContextMenu(menu, 0, 1, 0x7FFF, ExplorerFlags);
+            if (hr < 0) throw new COMException("QueryContextMenu", hr);
+            var items = new List<KeyValuePair<uint, string>>();
+            Collect(menu, items);
+            var names = new List<string>();
+            foreach (var item in items) {
+                names.Add(item.Value);
+                if (!invoked && invokeText != null && item.Value == invokeText && item.Key != 0xFFFFFFFF) {
+                    var info = new RcInvokeInfo();
+                    info.cbSize = Marshal.SizeOf(typeof(RcInvokeInfo));
+                    info.lpVerb = new IntPtr(item.Key - 1);
+                    info.nShow = 1;
+                    hr = menuHandler.InvokeCommand(ref info);
+                    if (hr != 0) throw new COMException("InvokeCommand", hr);
+                    invoked = true;
+                }
+            }
+            return string.Join(" | ", names);
+        } finally { DestroyMenu(menu); }
+    }
+    // The registered handler alone, initialized exactly as Explorer does.
+    public static string Handler(Guid clsid, string path) {
+        object instance = Activator.CreateInstance(Type.GetTypeFromCLSID(clsid, true));
+        IntPtr data = UiObject(path, new Guid("0000010e-0000-0000-C000-000000000046"));
+        int hr = ((IRcShellExtInit)instance).Initialize(IntPtr.Zero, data, IntPtr.Zero);
+        if (hr != 0) throw new COMException("IShellExtInit.Initialize", hr);
+        bool unused;
+        return Run((IRcContextMenu)instance, null, out unused);
+    }
+    // The complete Shell item context menu, as Explorer builds it.
+    public static string Shell(string path, string invokeText, out bool invoked) {
+        IntPtr pointer = UiObject(path, typeof(IRcContextMenu).GUID);
+        return Run((IRcContextMenu)Marshal.GetObjectForIUnknown(pointer), invokeText, out invoked);
+    }
+}
+"@
+Write-Output ('HANDLER: ' + [RcMenuProbe]::Handler([guid]$Clsid, $Path))
+$invoked = $false
+Write-Output ('SHELL: ' + [RcMenuProbe]::Shell($Path, 'Convert to webp', [ref]$invoked))
+if ($invoked) { Write-Output 'QUICK_VERB_INVOKED' }
 '@, (New-Object Text.UTF8Encoding($true)))
     $powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
     $probeOutput = & $powershell -NoProfile -ExecutionPolicy Bypass -STA -File $shellProbe `
-        -Clsid $script:RightConvertQuickCascadeClsid -Folder $probeDir -Name 'probe image.png' 2>&1
+        -Clsid $script:RightConvertQuickCascadeClsid -Path $image 2>&1
     $probeOutput | ForEach-Object { Write-Host $_ }
-    if ($LASTEXITCODE -ne 0 -or -not ($probeOutput -match 'COM_ACTIVATION_OK')) {
-        throw 'The registered quick-menu COM class could not be activated'
+    if ($LASTEXITCODE -ne 0) { throw "Context-menu probe failed: exit $LASTEXITCODE" }
+    $handlerLine = @($probeOutput | Where-Object { "$_" -like 'HANDLER: *' })
+    $shellLine = @($probeOutput | Where-Object { "$_" -like 'SHELL: *' })
+    if ($handlerLine.Count -ne 1 -or "$($handlerLine[0])" -notlike '*Convert to webp*' -or
+        "$($handlerLine[0])" -match 'Convert to (mp3|mp4|PNG \(all)') {
+        throw 'The registered native handler does not offer exactly the image quick targets for a PNG'
     }
-    if (-not ($probeOutput -match 'MAIN_VERB_OK')) {
-        throw 'Shell context menu does not offer "Convert with RightConvert"'
+    if ($shellLine.Count -ne 1 -or "$($shellLine[0])" -notmatch 'Convert with RightConvert') {
+        throw 'Shell item context menu does not offer "Convert with RightConvert"'
     }
     if (-not ($probeOutput -match 'QUICK_VERB_INVOKED')) {
         throw 'Shell context menu does not offer the native "Convert to webp" action'
