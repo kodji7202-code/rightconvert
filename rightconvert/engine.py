@@ -117,6 +117,29 @@ def _create_private_staging(output_dir: Path) -> Path:
     raise ConversionError("Could not allocate a private staging directory")
 
 
+def _windows_long_path(path: Path) -> Path:
+    """Expand 8.3 short components (``C:\\Users\\RUNNER~1``) on Windows.
+
+    GetLongPathNameW only rewrites short names component by component; it
+    does not follow symlinks or junctions, so a real redirection still differs
+    from ``Path.resolve`` afterwards. %TEMP% is commonly a short path.
+    """
+    if os.name != "nt":
+        return path
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        get_long = ctypes.WinDLL("kernel32", use_last_error=True).GetLongPathNameW
+        get_long.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+        get_long.restype = wintypes.DWORD
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_long(str(path), buffer, len(buffer))
+    except (AttributeError, OSError):
+        return path
+    return Path(buffer.value) if 0 < length < len(buffer) else path
+
+
 def _safe_output_directory(folder: Path) -> Path:
     """Reject redirections through symlinks, junctions or other reparse points.
 
@@ -137,7 +160,8 @@ def _safe_output_directory(folder: Path) -> Path:
                 raise ConversionError("Output folder cannot contain a junction")
         candidate.mkdir(parents=True, exist_ok=True)
         actual = candidate.resolve(strict=True)
-        if os.path.normcase(str(actual)) != os.path.normcase(str(candidate)):
+        expected = _windows_long_path(candidate)
+        if os.path.normcase(str(actual)) != os.path.normcase(str(expected)):
             raise ConversionError("Output folder was redirected while preparing the conversion")
         # Recheck after mkdir to reject a reparse point created during setup.
         for node in (*reversed(candidate.parents), candidate):
