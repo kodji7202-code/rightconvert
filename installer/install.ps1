@@ -8,12 +8,17 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\installer\install.ps1
 #>
 [CmdletBinding()]
 param(
-    [string]$PackageDir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\RightConvert'),
+    [string]$PackageDir,
     [string]$TestFixtureRoot,
     [switch]$EnableExperimentalQuickMenu,
     [switch]$DisableQuickMenu
 )
 $ErrorActionPreference = 'Stop'
+# Resolve the default here, not in param(): Windows PowerShell 5.1 leaves
+# $PSScriptRoot empty while evaluating param() defaults under -File.
+if (-not $PackageDir) {
+    $PackageDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'dist\RightConvert'
+}
 . (Join-Path $PSScriptRoot 'common.ps1')
 
 # Restricted integration-test sandbox. Test roots and HKCU keys are uniquely
