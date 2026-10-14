@@ -413,14 +413,12 @@ def _stop_process(proc: subprocess.Popen[bytes]) -> None:
     if proc.poll() is not None:
         return
     if os.name == "nt":
-        # soffice.exe can spawn soffice.bin. Kill descendants as well.
-        try:
-            subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"],
-                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL, timeout=5, check=False,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        except (OSError, subprocess.TimeoutExpired):
-            pass
+        # soffice.exe can spawn soffice.bin. Kill descendants as well, using
+        # the trusted System32 taskkill.exe only. A bare "taskkill" would be
+        # resolved by CreateProcess through the application directory, the
+        # current directory (a user's folder in Explorer) and PATH first.
+        from .engine import _kill_process_tree_windows
+        _kill_process_tree_windows(proc.pid)
     else:
         import signal
         try:
