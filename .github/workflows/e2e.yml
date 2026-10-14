@@ -57,6 +57,7 @@ jobs:
           .\installer\build-native.ps1 -Architecture x64 -PackageDir .\dist\RightConvert
 
       - name: Build the graphical Setup EXE
+        id: setup_exe
         run: |
           python scripts/build_setup.py
           if ($LASTEXITCODE -ne 0) { throw "build_setup.py failed" }
@@ -109,6 +110,7 @@ jobs:
           }
 
       - name: Real per-user install via Setup code path, Shell context menu, uninstall
+        if: ${{ !cancelled() && steps.setup_exe.outcome == 'success' }}
         env:
           RIGHTCONVERT_E2E_REAL_INSTALL: '1'
         run: |
@@ -118,12 +120,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "real install e2e failed with exit code $LASTEXITCODE" }
 
       - name: Cache the LibreOffice MSI
+        if: ${{ !cancelled() && steps.setup_exe.outcome == 'success' }}
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}\lo-msi
           key: libreoffice-msi-${{ env.LO_SHA256 }}
 
       - name: Download + verify + administratively extract official LibreOffice
+        if: ${{ !cancelled() && steps.setup_exe.outcome == 'success' }}
         run: |
           $cache = Join-Path $env:RUNNER_TEMP 'lo-msi'
           New-Item -ItemType Directory -Path $cache -Force | Out-Null
@@ -154,6 +158,7 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "RC_LO_PROGRAM=$(Join-Path $portable 'program')"
 
       - name: Full pytest with every opt-in enabled
+        if: ${{ !cancelled() && steps.setup_exe.outcome == 'success' }}
         env:
           RIGHTCONVERT_STAGE7_OFFICE_NATIVE: '1'
         run: |
