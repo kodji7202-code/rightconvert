@@ -36,7 +36,7 @@ On Windows with Python 3.10+, from a PowerShell terminal:
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e . pytest
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
 .\.venv\Scripts\python.exe -m rightconvert
 ```
 
@@ -48,7 +48,7 @@ features additionally require independent FFmpeg/FFprobe and LibreOffice.
 Windows build tools and Python dependencies are required.
 
 ```powershell
-python -m pip install -e . pyinstaller pytest
+python -m pip install -e ".[test]" pyinstaller
 python -m pytest -q
 .\build.ps1
 python scripts/build_setup.py
