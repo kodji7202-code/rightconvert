@@ -655,7 +655,10 @@ $entry.SetValue('DisplayVersion', '0.3.0', [Microsoft.Win32.RegistryValueKind]::
         $entry.SetValue('InstallLocation', $Root, [Microsoft.Win32.RegistryValueKind]::String)
         $entry.SetValue('DisplayIcon', ('"' + $exe + '",0'), [Microsoft.Win32.RegistryValueKind]::String)
         # ExecutionPolicy Bypass applies only to the uninstaller process; no policy is changed.
-        $entry.SetValue('UninstallString', ('"powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "' + $uninstaller + '"'), [Microsoft.Win32.RegistryValueKind]::String)
+        # Absolute System32 path: Settings/appwiz must never resolve a bare
+        # powershell.exe through its own directory, CWD or PATH.
+        $powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+        $entry.SetValue('UninstallString', ('"' + $powershell + '" -NoProfile -ExecutionPolicy Bypass -File "' + $uninstaller + '"'), [Microsoft.Win32.RegistryValueKind]::String)
         $entry.SetValue('NoModify', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
         $entry.SetValue('NoRepair', 1, [Microsoft.Win32.RegistryValueKind]::DWord)
         $entry.SetValue('InstallerId', $script:RightConvertInstallerId, [Microsoft.Win32.RegistryValueKind]::String)
