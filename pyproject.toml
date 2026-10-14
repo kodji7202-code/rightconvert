@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rightconvert"
+version = "0.3.0"
+description = "MIT-licensed local Windows Explorer file converter"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "Pillow>=10.4,<13",
+    # Permissively licensed PDF rendering (PDFium binary and its many
+    # transitive notice files MUST be included in customer distributions).
+    "pypdfium2>=5.14,<6",
+    # Ed25519 public-key license verification is fully offline. Never embed the
+    # commercial issuer's private signing key in the desktop distribution.
+    "cryptography>=45,<49",
+]
+
+[project.scripts]
+rightconvert = "rightconvert.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["rightconvert*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

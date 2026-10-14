@@ -1,0 +1,197 @@
+{
+  "test": "RightConvert Stage4 directed format matrix",
+  "platform": "Windows 11 host; run on other OS explicitly to extend coverage",
+  "ffmpeg": "ffmpeg.exe",
+  "ffprobe": "ffprobe.exe",
+  "cases_passed": 14,
+  "cases_expected": 14,
+  "collision_passed": true,
+  "original_hashes_checked": true,
+  "probes": "Pillow decoder and external FFprobe",
+  "results": [
+    {
+      "source": "imagine și 東京.png",
+      "target": "jpg",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "30aeddd70e1330996ffb00fbdafca958aa9d67862abfff9b27b60c0697dded11",
+      "result": "imagine și 東京.jpg",
+      "bytes": 318,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "imagine și 東京.png",
+      "target": "webp",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "30aeddd70e1330996ffb00fbdafca958aa9d67862abfff9b27b60c0697dded11",
+      "result": "imagine și 東京.webp",
+      "bytes": 90,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "imagine și 東京.jpg",
+      "target": "png",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "b424ffd8d10563c61c455feefea48ec52de37facc5c3e57fb499598736b37c63",
+      "result": "imagine și 東京.png",
+      "bytes": 168,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "imagine și 東京.jpg",
+      "target": "webp",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "b424ffd8d10563c61c455feefea48ec52de37facc5c3e57fb499598736b37c63",
+      "result": "imagine și 東京 (1).webp",
+      "bytes": 90,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "imagine și 東京.webp",
+      "target": "png",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "c80bba75fcadb10e4217882fcc7d585043df6ed90da7786406f31279cf080314",
+      "result": "imagine și 東京 (1).png",
+      "bytes": 276,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "imagine și 東京.webp",
+      "target": "jpg",
+      "kind": "image",
+      "status": "PASS",
+      "input_sha256": "c80bba75fcadb10e4217882fcc7d585043df6ed90da7786406f31279cf080314",
+      "result": "imagine și 東京 (1).jpg",
+      "bytes": 349,
+      "dimensions": [
+        79,
+        53
+      ]
+    },
+    {
+      "source": "cântec 東京.wav",
+      "target": "mp3",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "842d8ff3d950813e85a6f5cd2e3c0639ea69070ca01766ad47184befd309b8ec",
+      "result": "cântec 東京.mp3",
+      "bytes": 1110,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.066
+    },
+    {
+      "source": "cântec 東京.wav",
+      "target": "flac",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "842d8ff3d950813e85a6f5cd2e3c0639ea69070ca01766ad47184befd309b8ec",
+      "result": "cântec 東京.flac",
+      "bytes": 8398,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.0
+    },
+    {
+      "source": "sound-mp3.mp3",
+      "target": "wav",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "63e514d5936bf4c30989c85027d45adea13ac31f310f4648e4dfcdff482892d6",
+      "result": "sound-mp3.wav",
+      "bytes": 44178,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.0
+    },
+    {
+      "source": "sound-mp3.mp3",
+      "target": "flac",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "63e514d5936bf4c30989c85027d45adea13ac31f310f4648e4dfcdff482892d6",
+      "result": "sound-mp3.flac",
+      "bytes": 8408,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.0
+    },
+    {
+      "source": "sound-flac.flac",
+      "target": "mp3",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "fe5b1894acc6022c4e10bdbbc5a747ab7560b80f845e5054781d5c363b7f3192",
+      "result": "sound-flac.mp3",
+      "bytes": 1110,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.066
+    },
+    {
+      "source": "sound-flac.flac",
+      "target": "wav",
+      "kind": "audio",
+      "status": "PASS",
+      "input_sha256": "fe5b1894acc6022c4e10bdbbc5a747ab7560b80f845e5054781d5c363b7f3192",
+      "result": "sound-flac.wav",
+      "bytes": 44178,
+      "streams": [
+        "audio"
+      ],
+      "duration": 1.0
+    },
+    {
+      "source": "sample video.mp4",
+      "target": "webm",
+      "kind": "video",
+      "status": "PASS",
+      "input_sha256": "c8493d4e7a75242e98327b285198bf6e89e8609e8da476646b06dbfdd57ca506",
+      "result": "sample video.webm",
+      "bytes": 46972,
+      "streams": [
+        "audio",
+        "video"
+      ],
+      "duration": 1.533
+    },
+    {
+      "source": "sample video.webm",
+      "target": "mp4",
+      "kind": "video",
+      "status": "PASS",
+      "input_sha256": "53314cb58bab769a4c89e85592dba4b98f96bbfe4046ef9382c9d03d926f94a7",
+      "result": "sample video.mp4",
+      "bytes": 44156,
+      "streams": [
+        "audio",
+        "video"
+      ],
+      "duration": 1.74
+    }
+  ]
+}

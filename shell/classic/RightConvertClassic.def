@@ -1,0 +1,4 @@
+LIBRARY RightConvertClassic
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

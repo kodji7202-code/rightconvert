@@ -1,0 +1,1580 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-10-13T18:14:56+00:00",
+  "app_version": "v0.2 source tree (not published package)",
+  "python_version": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "fixture": {
+    "image_px": [
+      100,
+      60
+    ],
+    "video_px": [
+      160,
+      90
+    ],
+    "seconds": 0.6,
+    "video_fps": 10,
+    "audio_hz": 24000,
+    "contains_audio_in_video": true
+  },
+  "routes": [
+    {
+      "family": "image",
+      "source": "bmp",
+      "target": "jpg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 330,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "bmp",
+      "target": "png",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 209,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "bmp",
+      "target": "webp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 94,
+      "seconds": 0.016
+    },
+    {
+      "family": "image",
+      "source": "bmp",
+      "target": "tiff",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18140,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "gif",
+      "target": "jpg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 330,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "gif",
+      "target": "png",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 103,
+      "seconds": 0.015
+    },
+    {
+      "family": "image",
+      "source": "gif",
+      "target": "webp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 94,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "gif",
+      "target": "bmp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 6070,
+      "seconds": 0.016
+    },
+    {
+      "family": "image",
+      "source": "gif",
+      "target": "tiff",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 7670,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "jpg",
+      "target": "png",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 209,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "jpg",
+      "target": "webp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 94,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "jpg",
+      "target": "bmp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18054,
+      "seconds": 0.015
+    },
+    {
+      "family": "image",
+      "source": "jpg",
+      "target": "tiff",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18140,
+      "seconds": 0.016
+    },
+    {
+      "family": "image",
+      "source": "png",
+      "target": "jpg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 330,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "png",
+      "target": "webp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 94,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "png",
+      "target": "bmp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18054,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "png",
+      "target": "tiff",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18140,
+      "seconds": 0.016
+    },
+    {
+      "family": "image",
+      "source": "tiff",
+      "target": "jpg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 330,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "tiff",
+      "target": "png",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 209,
+      "seconds": 0.015
+    },
+    {
+      "family": "image",
+      "source": "tiff",
+      "target": "webp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 94,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "tiff",
+      "target": "bmp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18054,
+      "seconds": 0.016
+    },
+    {
+      "family": "image",
+      "source": "webp",
+      "target": "jpg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 356,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "webp",
+      "target": "png",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 307,
+      "seconds": 0.0
+    },
+    {
+      "family": "image",
+      "source": "webp",
+      "target": "bmp",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18054,
+      "seconds": 0.015
+    },
+    {
+      "family": "image",
+      "source": "webp",
+      "target": "tiff",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "output_bytes": 18140,
+      "seconds": 0.016
+    },
+    {
+      "family": "audio",
+      "source": "flac",
+      "target": "mp3",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mp3",
+        "codecs": [
+          "mp3"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 2828,
+      "seconds": 0.359
+    },
+    {
+      "family": "audio",
+      "source": "flac",
+      "target": "wav",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "wav_pcm_check": {
+        "decoder": "wave.readframes",
+        "channels": 1,
+        "rate": 24000,
+        "sample_width": 2,
+        "decoded_bytes": 28800,
+        "header_riff_size": 28870,
+        "metadata_frames": 14400
+      },
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "wav",
+        "codecs": [
+          "pcm_s16le"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 28878,
+      "seconds": 0.313
+    },
+    {
+      "family": "audio",
+      "source": "flac",
+      "target": "ogg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "vorbis"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 4256,
+      "seconds": 0.359
+    },
+    {
+      "family": "audio",
+      "source": "flac",
+      "target": "opus",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "opus"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 5838,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "mp3",
+      "target": "wav",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "wav_pcm_check": {
+        "decoder": "wave.readframes",
+        "channels": 1,
+        "rate": 24000,
+        "sample_width": 2,
+        "decoded_bytes": 28800,
+        "header_riff_size": 28870,
+        "metadata_frames": 14400
+      },
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "wav",
+        "codecs": [
+          "pcm_s16le"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 28878,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "mp3",
+      "target": "flac",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "flac",
+        "codecs": [
+          "flac"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 26673,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "mp3",
+      "target": "ogg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "vorbis"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 4390,
+      "seconds": 0.344
+    },
+    {
+      "family": "audio",
+      "source": "mp3",
+      "target": "opus",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "opus"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 5892,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "ogg",
+      "target": "mp3",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mp3",
+        "codecs": [
+          "mp3"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 2348,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "ogg",
+      "target": "wav",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "wav_pcm_check": {
+        "decoder": "wave.readframes",
+        "channels": 1,
+        "rate": 24000,
+        "sample_width": 2,
+        "decoded_bytes": 29440,
+        "header_riff_size": 29510,
+        "metadata_frames": 14720
+      },
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "wav",
+        "codecs": [
+          "pcm_s16le"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 29518,
+      "seconds": 0.313
+    },
+    {
+      "family": "audio",
+      "source": "ogg",
+      "target": "flac",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "flac",
+        "codecs": [
+          "flac"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 27997,
+      "seconds": 0.344
+    },
+    {
+      "family": "audio",
+      "source": "ogg",
+      "target": "opus",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "opus"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 5760,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "opus",
+      "target": "mp3",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mp3",
+        "codecs": [
+          "mp3"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 4796,
+      "seconds": 0.343
+    },
+    {
+      "family": "audio",
+      "source": "opus",
+      "target": "wav",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "wav_pcm_check": {
+        "decoder": "wave.readframes",
+        "channels": 1,
+        "rate": 48000,
+        "sample_width": 2,
+        "decoded_bytes": 57600,
+        "header_riff_size": 57670,
+        "metadata_frames": 28800
+      },
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "wav",
+        "codecs": [
+          "pcm_s16le"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 57678,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "opus",
+      "target": "flac",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "flac",
+        "codecs": [
+          "flac"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 44764,
+      "seconds": 0.344
+    },
+    {
+      "family": "audio",
+      "source": "opus",
+      "target": "ogg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "vorbis"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 4836,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "wav",
+      "target": "mp3",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mp3",
+        "codecs": [
+          "mp3"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 2828,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "wav",
+      "target": "flac",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "flac",
+        "codecs": [
+          "flac"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 13726,
+      "seconds": 0.328
+    },
+    {
+      "family": "audio",
+      "source": "wav",
+      "target": "ogg",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "vorbis"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 4256,
+      "seconds": 0.344
+    },
+    {
+      "family": "audio",
+      "source": "wav",
+      "target": "opus",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "opus"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "output_bytes": 5838,
+      "seconds": 0.344
+    },
+    {
+      "family": "video",
+      "source": "avi",
+      "target": "mp4",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 8970,
+      "seconds": 0.391
+    },
+    {
+      "family": "video",
+      "source": "avi",
+      "target": "webm",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "vp9",
+          "opus"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 13411,
+      "seconds": 0.39
+    },
+    {
+      "family": "video",
+      "source": "avi",
+      "target": "mkv",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 8051,
+      "seconds": 0.407
+    },
+    {
+      "family": "video",
+      "source": "mkv",
+      "target": "mp4",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 8566,
+      "seconds": 0.407
+    },
+    {
+      "family": "video",
+      "source": "mkv",
+      "target": "webm",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "vp9",
+          "opus"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 13839,
+      "seconds": 0.39
+    },
+    {
+      "family": "video",
+      "source": "mov",
+      "target": "mp4",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 8017,
+      "seconds": 0.406
+    },
+    {
+      "family": "video",
+      "source": "mov",
+      "target": "webm",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "vp9",
+          "opus"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 13024,
+      "seconds": 0.406
+    },
+    {
+      "family": "video",
+      "source": "mov",
+      "target": "mkv",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 7183,
+      "seconds": 0.406
+    },
+    {
+      "family": "video",
+      "source": "mp4",
+      "target": "webm",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "vp9",
+          "opus"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 13044,
+      "seconds": 0.406
+    },
+    {
+      "family": "video",
+      "source": "mp4",
+      "target": "mkv",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 7203,
+      "seconds": 0.39
+    },
+    {
+      "family": "video",
+      "source": "webm",
+      "target": "mp4",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 13480,
+      "seconds": 0.406
+    },
+    {
+      "family": "video",
+      "source": "webm",
+      "target": "mkv",
+      "status": "PASS",
+      "source_untouched": true,
+      "temp_clean": true,
+      "verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "output_bytes": 11399,
+      "seconds": 0.375
+    }
+  ],
+  "inputs": [
+    {
+      "family": "image",
+      "source_format": "bmp",
+      "fixture_created": true,
+      "detected_format": "bmp",
+      "advertised_targets": [
+        "jpg",
+        "png",
+        "webp",
+        "tiff"
+      ],
+      "status": "PASS",
+      "source_sha256": "d90dc0d7f249a24c86f03116a3da843bcae2cecbf9e00e39a0076d277c5f7175",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "BMP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "image",
+      "source_format": "gif",
+      "fixture_created": true,
+      "detected_format": "gif",
+      "advertised_targets": [
+        "jpg",
+        "png",
+        "webp",
+        "bmp",
+        "tiff"
+      ],
+      "status": "PASS",
+      "source_sha256": "3c94ac0575684bef1317a7da15b245d9e36d6771b4c01a2a440c02fdb7d92822",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "GIF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "image",
+      "source_format": "jpg",
+      "fixture_created": true,
+      "detected_format": "jpg",
+      "advertised_targets": [
+        "png",
+        "webp",
+        "bmp",
+        "tiff"
+      ],
+      "status": "PASS",
+      "source_sha256": "e899ca7bca798d015d1318327c833febfe96a16ac690fe2150958d0275f9d430",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "JPEG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "image",
+      "source_format": "png",
+      "fixture_created": true,
+      "detected_format": "png",
+      "advertised_targets": [
+        "jpg",
+        "webp",
+        "bmp",
+        "tiff"
+      ],
+      "status": "PASS",
+      "source_sha256": "cb43edcc4ae0d5e73346fc8374d7f7712616907522f985f45e9a950282edaab6",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "PNG",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "image",
+      "source_format": "tiff",
+      "fixture_created": true,
+      "detected_format": "tiff",
+      "advertised_targets": [
+        "jpg",
+        "png",
+        "webp",
+        "bmp"
+      ],
+      "status": "PASS",
+      "source_sha256": "4773390238f001fe1c17b26a4853c074657ab19a7e45a7123d1cd79c3bdb9f28",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "TIFF",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "image",
+      "source_format": "webp",
+      "fixture_created": true,
+      "detected_format": "webp",
+      "advertised_targets": [
+        "jpg",
+        "png",
+        "bmp",
+        "tiff"
+      ],
+      "status": "PASS",
+      "source_sha256": "7ad2ef4f83f0287436e576b2e2589b79243efbc0042f7dfaf734cb19fad85f4a",
+      "fixture_verification": {
+        "decoder": "Pillow/Image.load",
+        "format": "WEBP",
+        "size": [
+          100,
+          60
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "audio",
+      "source_format": "flac",
+      "fixture_created": true,
+      "detected_format": "flac",
+      "advertised_targets": [
+        "mp3",
+        "wav",
+        "ogg",
+        "opus"
+      ],
+      "status": "PASS",
+      "source_sha256": "2fc5fbe188e2b7abe7a7fa4132147f670daa83367bf2f570a109a69d0733dcb5",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "flac",
+        "codecs": [
+          "flac"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "audio",
+      "source_format": "mp3",
+      "fixture_created": true,
+      "detected_format": "mp3",
+      "advertised_targets": [
+        "wav",
+        "flac",
+        "ogg",
+        "opus"
+      ],
+      "status": "PASS",
+      "source_sha256": "611212f41a28cbfc454dafce95277bb6863ce10c34496605cbc297a431e0188d",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mp3",
+        "codecs": [
+          "mp3"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "audio",
+      "source_format": "ogg",
+      "fixture_created": true,
+      "detected_format": "ogg",
+      "advertised_targets": [
+        "mp3",
+        "wav",
+        "flac",
+        "opus"
+      ],
+      "status": "PASS",
+      "source_sha256": "2d4badc96aa7989d42a41c83d21112c35ab87a3c4983fe88626f17e4c9a2136e",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "vorbis"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "audio",
+      "source_format": "opus",
+      "fixture_created": true,
+      "detected_format": "opus",
+      "advertised_targets": [
+        "mp3",
+        "wav",
+        "flac",
+        "ogg"
+      ],
+      "status": "PASS",
+      "source_sha256": "9a1891b049c2c68d6530614097af5a413c58679a6426dda0b0b670ab3a62f6fb",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "ogg",
+        "codecs": [
+          "opus"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "audio",
+      "source_format": "wav",
+      "fixture_created": true,
+      "detected_format": "wav",
+      "advertised_targets": [
+        "mp3",
+        "flac",
+        "ogg",
+        "opus"
+      ],
+      "status": "PASS",
+      "source_sha256": "925874fe9b8485652f7521f1ef7c7b4f3ff31c90a3abede93d84a0df7c9c3d86",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "wav",
+        "codecs": [
+          "pcm_s16le"
+        ],
+        "streams": [
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "video",
+      "source_format": "avi",
+      "fixture_created": true,
+      "detected_format": "avi",
+      "advertised_targets": [
+        "mp4",
+        "webm",
+        "mkv"
+      ],
+      "status": "PASS",
+      "source_sha256": "3e83ec6a534ec184ec006d71cb3b5c32f03b715a170af97d17182825812d054d",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "avi",
+        "codecs": [
+          "mpeg4",
+          "mp3"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "video",
+      "source_format": "mkv",
+      "fixture_created": true,
+      "detected_format": "mkv",
+      "advertised_targets": [
+        "mp4",
+        "webm"
+      ],
+      "status": "PASS",
+      "source_sha256": "4210745bba1f07216119ff87e1340c7ee29a5a125fb1e73cb4d71d823ca86526",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "mpeg4",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "video",
+      "source_format": "mov",
+      "fixture_created": true,
+      "detected_format": "mov",
+      "advertised_targets": [
+        "mp4",
+        "webm",
+        "mkv"
+      ],
+      "status": "PASS",
+      "source_sha256": "29a52774c47241aaec8d7d15c4a4f0c1f1789df1794965188da0269d02b10036",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "mpeg4",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "video",
+      "source_format": "mp4",
+      "fixture_created": true,
+      "detected_format": "mp4",
+      "advertised_targets": [
+        "webm",
+        "mkv"
+      ],
+      "status": "PASS",
+      "source_sha256": "07bc9f2c4c8bfa6b74fd4686193cd3bfd6c1075e91dc010cbd1b41c1ab88c938",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "mov,mp4,m4a,3gp,3g2,mj2",
+        "codecs": [
+          "h264",
+          "aac"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    },
+    {
+      "family": "video",
+      "source_format": "webm",
+      "fixture_created": true,
+      "detected_format": "webm",
+      "advertised_targets": [
+        "mp4",
+        "mkv"
+      ],
+      "status": "PASS",
+      "source_sha256": "87059352151649b271ff786a0a8f5534187877c1058c99996703f81e24985ccf",
+      "fixture_verification": {
+        "decoder": "FFprobe + FFmpeg decode-to-null",
+        "container": "matroska,webm",
+        "codecs": [
+          "vp9",
+          "opus"
+        ],
+        "streams": [
+          "video",
+          "audio"
+        ]
+      },
+      "source_untouched": true
+    }
+  ],
+  "errors": [],
+  "ffmpeg": "ffmpeg version 8.0.1-full_build-www.gyan.dev Copyright (c) 2000-2025 the FFmpeg developers",
+  "ffprobe": "ffprobe version 8.0.1-full_build-www.gyan.dev Copyright (c) 2007-2025 the FFmpeg developers",
+  "summary": {
+    "status": "PASS",
+    "input_families": 16,
+    "inputs_pass": 16,
+    "input_fail": 0,
+    "routes_advertised": 57,
+    "pass": 57,
+    "fail": 0,
+    "general_errors": 0,
+    "total_failures": 0
+  }
+}

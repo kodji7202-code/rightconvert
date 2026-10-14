@@ -1,0 +1,4 @@
+LIBRARY RightConvertExplorer
+EXPORTS
+    DllGetClassObject PRIVATE
+    DllCanUnloadNow PRIVATE

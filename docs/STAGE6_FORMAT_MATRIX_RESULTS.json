@@ -1,0 +1,697 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-10-13T19:40:14.083952+00:00",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.10",
+  "documents": [
+    {
+      "source": "single",
+      "kind": "pdf",
+      "path": "document ședință 東京 single.pdf",
+      "status": "PASS",
+      "advertised": [
+        "png",
+        "jpg",
+        "webp",
+        "tiff",
+        "pngzip"
+      ],
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            96,
+            72
+          ]
+        ]
+      }
+    },
+    {
+      "source": "multi",
+      "kind": "pdf",
+      "path": "document ședință 東京 multi.pdf",
+      "status": "PASS",
+      "advertised": [
+        "tiff",
+        "pngzip"
+      ],
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 3,
+        "sizes_pt": [
+          [
+            96,
+            72
+          ],
+          [
+            72,
+            96
+          ],
+          [
+            120,
+            84
+          ]
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 single.pdf",
+      "target": "png",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "Pillow.Image.load",
+        "frames": 1,
+        "size_px": [
+          [
+            192,
+            144
+          ]
+        ]
+      },
+      "output_bytes": 427,
+      "elapsed_s": 0.015,
+      "input_family": "pdf-single"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 single.pdf",
+      "target": "jpg",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "Pillow.Image.load",
+        "frames": 1,
+        "size_px": [
+          [
+            192,
+            144
+          ]
+        ]
+      },
+      "output_bytes": 1059,
+      "elapsed_s": 0.0,
+      "input_family": "pdf-single"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 single.pdf",
+      "target": "webp",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "Pillow.Image.load",
+        "frames": 1,
+        "size_px": [
+          [
+            192,
+            144
+          ]
+        ]
+      },
+      "output_bytes": 110,
+      "elapsed_s": 0.016,
+      "input_family": "pdf-single"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 single.pdf",
+      "target": "tiff",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "Pillow.Image.load",
+        "frames": 1,
+        "size_px": [
+          [
+            192,
+            144
+          ]
+        ]
+      },
+      "output_bytes": 282,
+      "elapsed_s": 0.015,
+      "input_family": "pdf-single"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 single.pdf",
+      "target": "pngzip",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "zipfile CRC + Pillow.Image.load",
+        "pages": 1,
+        "entries": [
+          "page-0001.png"
+        ],
+        "decoded": [
+          {
+            "reader": "Pillow.Image.load",
+            "frames": 1,
+            "size_px": [
+              [
+                192,
+                144
+              ]
+            ]
+          }
+        ]
+      },
+      "output_bytes": 551,
+      "elapsed_s": 0.0,
+      "input_family": "pdf-single"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 multi.pdf",
+      "target": "tiff",
+      "pages": 3,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "Pillow.Image.load",
+        "frames": 3,
+        "size_px": [
+          [
+            192,
+            144
+          ],
+          [
+            144,
+            192
+          ],
+          [
+            240,
+            168
+          ]
+        ]
+      },
+      "output_bytes": 204480,
+      "elapsed_s": 0.031,
+      "input_family": "pdf-multi"
+    },
+    {
+      "operation": "convert",
+      "source": "document ședință 東京 multi.pdf",
+      "target": "pngzip",
+      "pages": 3,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "zipfile CRC + Pillow.Image.load",
+        "pages": 3,
+        "entries": [
+          "page-0001.png",
+          "page-0002.png",
+          "page-0003.png"
+        ],
+        "decoded": [
+          {
+            "reader": "Pillow.Image.load",
+            "frames": 1,
+            "size_px": [
+              [
+                192,
+                144
+              ]
+            ]
+          },
+          {
+            "reader": "Pillow.Image.load",
+            "frames": 1,
+            "size_px": [
+              [
+                144,
+                192
+              ]
+            ]
+          },
+          {
+            "reader": "Pillow.Image.load",
+            "frames": 1,
+            "size_px": [
+              [
+                240,
+                168
+              ]
+            ]
+          }
+        ]
+      },
+      "output_bytes": 1804,
+      "elapsed_s": 0.032,
+      "input_family": "pdf-multi"
+    },
+    {
+      "operation": "convert",
+      "source": "image spații 東京.jpg",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            100,
+            60
+          ]
+        ]
+      },
+      "output_bytes": 1608,
+      "elapsed_s": 0.015,
+      "input_family": "image-jpg"
+    },
+    {
+      "operation": "convert",
+      "source": "image spații 東京.png",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            100,
+            60
+          ]
+        ]
+      },
+      "output_bytes": 1608,
+      "elapsed_s": 0.0,
+      "input_family": "image-png"
+    },
+    {
+      "operation": "convert",
+      "source": "image spații 東京.webp",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            100,
+            60
+          ]
+        ]
+      },
+      "output_bytes": 1610,
+      "elapsed_s": 0.016,
+      "input_family": "image-webp"
+    },
+    {
+      "operation": "convert",
+      "source": "image spații 東京.bmp",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            100,
+            60
+          ]
+        ]
+      },
+      "output_bytes": 1608,
+      "elapsed_s": 0.015,
+      "input_family": "image-bmp"
+    },
+    {
+      "operation": "convert",
+      "source": "image spații 東京.tiff",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            100,
+            60
+          ]
+        ]
+      },
+      "output_bytes": 1608,
+      "elapsed_s": 0.0,
+      "input_family": "image-tiff"
+    },
+    {
+      "operation": "combine",
+      "source": "combine 0 ședință 東京.png",
+      "target": "pdf",
+      "pages": 3,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 3,
+        "sizes_pt": [
+          [
+            70,
+            50
+          ],
+          [
+            80,
+            60
+          ],
+          [
+            90,
+            70
+          ]
+        ]
+      },
+      "output_bytes": 4001,
+      "elapsed_s": 0.016,
+      "input_family": "image-group-3"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.docx",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "output_bytes": 19860,
+      "elapsed_s": 13.844,
+      "input_family": "office-docx"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.xlsx",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "output_bytes": 19792,
+      "elapsed_s": 13.687,
+      "input_family": "office-xlsx"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.pptx",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            720,
+            540
+          ]
+        ]
+      },
+      "output_bytes": 20439,
+      "elapsed_s": 13.828,
+      "input_family": "office-pptx"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.odt",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "output_bytes": 23756,
+      "elapsed_s": 13.765,
+      "input_family": "office-odt"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.ods",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "output_bytes": 22805,
+      "elapsed_s": 13.438,
+      "input_family": "office-ods"
+    },
+    {
+      "operation": "convert",
+      "source": "stage6.odp",
+      "target": "pdf",
+      "pages": 1,
+      "status": "PASS",
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true,
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            794,
+            446
+          ]
+        ]
+      },
+      "output_bytes": 28107,
+      "elapsed_s": 13.687,
+      "input_family": "office-odp"
+    }
+  ],
+  "office": [
+    {
+      "source_format": "docx",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    },
+    {
+      "source_format": "xlsx",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    },
+    {
+      "source_format": "pptx",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            720,
+            540
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    },
+    {
+      "source_format": "odt",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    },
+    {
+      "source_format": "ods",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            612,
+            792
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    },
+    {
+      "source_format": "odp",
+      "target": "pdf",
+      "status": "PASS",
+      "independent_decode": {
+        "reader": "pypdf.PdfReader + PyMuPDF raster",
+        "pages": 1,
+        "sizes_pt": [
+          [
+            794,
+            446
+          ]
+        ]
+      },
+      "source_untouched": true,
+      "collision_preserved": true,
+      "temp_clean": true
+    }
+  ],
+  "errors": [],
+  "legacy_stage5": {
+    "status": "UNCHANGED",
+    "previous_evidence": "docs\\STAGE5_FORMAT_MATRIX_RESULTS.json",
+    "previously_passed_routes": 57,
+    "currently_advertised_legacy_routes": 57,
+    "live_fixtures": 16,
+    "note": "Stage5 conversions were previously executed; Stage6 rechecks their live advertisements"
+  },
+  "office_fixture_generation": {
+    "status": "PASS",
+    "families": [
+      "docx",
+      "odp",
+      "ods",
+      "odt",
+      "pptx",
+      "xlsx"
+    ],
+    "method": "Independent passive OOXML/ODF ZIP generator from tests/test_office_provider.py"
+  },
+  "libreoffice_executable_detected": true,
+  "summary": {
+    "status": "PASS",
+    "legacy_routes_unchanged": 57,
+    "new_routes_and_combines_advertised": 19,
+    "new_routes_and_combines_pass": 19,
+    "new_routes_and_combines_fail": 0,
+    "pdf_sources_verified": 2,
+    "office_routes_native_verified": 6,
+    "office_routes_unverified": 0,
+    "errors": 0
+  }
+}

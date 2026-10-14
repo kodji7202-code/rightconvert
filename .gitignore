@@ -1,0 +1,31 @@
+# Local builds and generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.idea/
+.vscode/
+.ruff_cache/
+*.egg-info/
+/build/
+/dist/
+/release/
+/qa-fixtures/
+/website/
+/installer/out/
+/shell/**/out/
+*.log
+*.pfx
+*.pem
+*.key
+*.msix
+*.dll
+*.exe
+*.zip
+*.sqlite
+.env
+.env.*
+# Never commit real beta/customer data or private key material
+*.secret
+*credentials*
+*private-key*
