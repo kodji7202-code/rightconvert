@@ -18,6 +18,12 @@ env:
   # Partner Center identity (msix-store/AppxManifest.xml). The test certificate
   # uses the same Publisher subject, so the sideloaded PFN equals the Store PFN.
   EXPECTED_PFN: 'Kodji.RightConvert_h9nm9abegh7ny'
+  # Same pinned official LibreOffice MSI as e2e.yml (shares its cache entry).
+  # Here it is really INSTALLED (machine-wide, not on PATH) to prove the
+  # packaged app finds a system LibreOffice via HKLM / Program Files.
+  LO_VERSION: '26.8.1'
+  LO_FULL_VERSION: '26.8.1.1'
+  LO_SHA256: 'c6298b10cfa1748bcbedad94c62ce771e240e5021bfd6d7a967cd571b04b5312'
 
 jobs:
   store-msix:
@@ -175,6 +181,85 @@ jobs:
           if (-not (Wait-File (Join-Path $dir 'a b.jpg') 30)) { throw 'alias --direct conversion produced no jpg' }
           Write-Host 'PASS: execution alias --direct png -> jpg'
 
+      - name: Cache the LibreOffice MSI
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\lo-msi
+          key: libreoffice-msi-${{ env.LO_SHA256 }}
+
+      - name: Install LibreOffice machine-wide; packaged app finds it and converts DOCX to PDF
+        shell: powershell
+        timeout-minutes: 25
+        run: |
+          $cache = Join-Path $env:RUNNER_TEMP 'lo-msi'
+          New-Item -ItemType Directory -Path $cache -Force | Out-Null
+          $msi = Join-Path $cache 'LibreOffice.msi'
+          $urls = @(
+            "https://download.documentfoundation.org/libreoffice/stable/$env:LO_VERSION/win/x86_64/LibreOffice_${env:LO_VERSION}_Win_x86-64.msi",
+            "https://downloadarchive.documentfoundation.org/libreoffice/old/$env:LO_FULL_VERSION/win/x86_64/LibreOffice_${env:LO_FULL_VERSION}_Win_x86-64.msi"
+          )
+          if (-not (Test-Path $msi) -or (Get-FileHash $msi -Algorithm SHA256).Hash -ne $env:LO_SHA256) {
+            foreach ($url in $urls) { try { Invoke-WebRequest -Uri $url -OutFile $msi -UseBasicParsing; break } catch { Write-Warning "$url : $_" } }
+          }
+          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash
+          if ($hash -ne $env:LO_SHA256) { throw "LibreOffice MSI SHA-256 mismatch: $hash" }
+          $log = Join-Path $env:RUNNER_TEMP 'lo-install.log'
+          $proc = Start-Process -FilePath (Join-Path ([Environment]::SystemDirectory) 'msiexec.exe') -ArgumentList @('/i', ('"' + $msi + '"'), '/qn', '/norestart', 'ALLUSERS=1', 'CREATEDESKTOPLINK=0', 'QUICKSTART=0', 'ISCHECKFORPRODUCTUPDATES=0', 'REGISTER_NO_MSO_TYPES=1', '/L*v', ('"' + $log + '"')) -Wait -PassThru
+          if ($proc.ExitCode -ne 0) { Get-Content $log -Tail 60; throw "LibreOffice install failed: $($proc.ExitCode)" }
+          $expected = Join-Path $env:ProgramFiles 'LibreOffice\program\soffice.exe'
+          if (-not (Test-Path -LiteralPath $expected)) { throw "Expected $expected" }
+          # The packaged app must NOT rely on PATH for this.
+          if (($env:PATH -split ';') | Where-Object { $_ -and (Test-Path (Join-Path $_ 'soffice.exe')) }) { throw 'soffice.exe unexpectedly on PATH' }
+
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          [ComImport, Guid("2e941141-7f97-4756-ba1d-9decde894a3d"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+          public interface IApplicationActivationManager {
+              [PreserveSig] int ActivateApplication([MarshalAs(UnmanagedType.LPWStr)] string appUserModelId,
+                  [MarshalAs(UnmanagedType.LPWStr)] string arguments, int options, out uint processId);
+          }
+          [ComImport, Guid("45BA127D-10A8-46EA-8AB7-56EA9078943C")]
+          public class ApplicationActivationManager {}
+          public static class RcActivate {
+              public static uint Launch(string aumid, string args) {
+                  var manager = (IApplicationActivationManager)new ApplicationActivationManager();
+                  uint pid;
+                  int hr = manager.ActivateApplication(aumid, args, 0, out pid);
+                  if (hr != 0) Marshal.ThrowExceptionForHR(hr);
+                  return pid;
+              }
+          }
+          '@
+          function Wait-File($path, $seconds) {
+            $deadline = (Get-Date).AddSeconds($seconds)
+            while ((Get-Date) -lt $deadline) { if (Test-Path -LiteralPath $path) { Start-Sleep -Milliseconds 500; return $true }; Start-Sleep -Milliseconds 500 }
+            return $false
+          }
+          $dir = Join-Path $env:GITHUB_WORKSPACE 'msix office test'
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $report = Join-Path $dir 'self-check-office.json'
+          [void][RcActivate]::Launch($env:RC_AUMID, "--self-check `"$report`"")
+          if (-not (Wait-File $report 90)) { throw 'Self-check report missing' }
+          $facts = Get-Content -LiteralPath $report -Raw | ConvertFrom-Json
+          Write-Host "Packaged app LibreOffice discovery: $($facts.libreoffice)"
+          if (-not $facts.libreoffice -or -not $facts.libreoffice.StartsWith($env:ProgramFiles, [StringComparison]::OrdinalIgnoreCase)) { throw 'Packaged app did not find the machine-wide LibreOffice' }
+          Copy-Item $report .\msix-store\out\self-check-office.json
+
+          $docx = Join-Path $dir 'raport test.docx'
+          python -c "import sys; from pathlib import Path; sys.path.insert(0, 'tests'); from test_release_office_acceptance import make_document; make_document(Path(sys.argv[1]))" $docx
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create the DOCX fixture' }
+          [void][RcActivate]::Launch($env:RC_AUMID, "--files `"$docx`" --target pdf --direct")
+          $pdf = Join-Path $dir 'raport test.pdf'
+          if (-not (Wait-File $pdf 240)) {
+            $logs = Get-ChildItem "$env:LOCALAPPDATA\Packages\$env:EXPECTED_PFN" -Recurse -Filter technical.log -ErrorAction SilentlyContinue
+            foreach ($l in $logs) { Write-Host "--- $($l.FullName)"; Get-Content $l.FullName -Tail 20 }
+            throw 'Packaged app produced no PDF from DOCX via the system LibreOffice'
+          }
+          $head = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($pdf), 0, 5)
+          if ($head -ne '%PDF-') { throw "Output is not a PDF: $head" }
+          Write-Host "PASS: packaged app DOCX -> PDF via machine-wide LibreOffice ($((Get-Item $pdf).Length) bytes)"
+
       - name: Windows 11 menu COM class resolves from the package (diagnostic)
         continue-on-error: true
         shell: powershell
@@ -234,7 +319,9 @@ jobs:
             if ($res -and $res -ne 'PASS') { Write-Host "  [$res] $($t.NAME)"; foreach ($m in $t.SelectNodes('.//MESSAGE')) { Write-Host "      $($m.TEXT)" } }
           }
           "result=$overall" >> $env:GITHUB_OUTPUT
-          if ($overall -ne 'PASS') { throw "WACK result: $overall" }
+          "### WACK: $overall" >> $env:GITHUB_STEP_SUMMARY
+          # WARNING does not block Store submission; FAIL does.
+          if ($overall -ne 'PASS' -and $overall -ne 'WARNING') { throw "WACK result: $overall" }
 
       - name: Remove the test certificate
         if: always()
@@ -256,6 +343,6 @@ jobs:
           name: RightConvert-Store-diagnostics
           path: |
             msix-store/out/*_x64.msix
-            msix-store/out/self-check.json
+            msix-store/out/self-check*.json
             msix-store/out/wack-report.xml
           if-no-files-found: ignore
